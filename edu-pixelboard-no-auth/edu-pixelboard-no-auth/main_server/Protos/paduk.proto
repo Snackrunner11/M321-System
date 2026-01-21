@@ -1,0 +1,15 @@
+syntax = "proto3";
+option csharp_namespace = "PixelBoard.Grpc";
+
+service PadukGrpc {
+  rpc GetTeamInfo (TeamInfoRequest) returns (TeamInfoReply);
+}
+
+message TeamInfoRequest {
+  int32 team = 1;
+}
+
+message TeamInfoReply {
+  uint32 score = 1;
+  uint32 paint_budget = 2;
+}

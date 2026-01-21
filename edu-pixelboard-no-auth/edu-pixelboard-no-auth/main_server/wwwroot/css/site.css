@@ -1,0 +1,80 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+button {
+  border-radius: 5px;
+  border: black solid 2px;
+  padding: 0.5rem;
+}
+
+h2 {
+  margin-top: 20px;
+}
+
+h3 {
+  color: gray;
+  font-size: revert;
+  text-transform: uppercase;
+}
+
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.board-container {
+  display: grid;
+  grid-template-columns: repeat(16, calc(min(100vw/20, 100vh/20)));
+  justify-content: center;
+}
+
+.pixel {
+  width: calc(min(100vw/20, 100vh/20));
+  height: calc(min(100vw/20, 100vh/20));
+}
+
+.buttons-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  width: 50%;
+  margin: 20px 0;
+}
+
+.danger {
+  border-color: red;
+  color: red;
+}
+
+.game {
+  display: grid;
+  grid-template-columns: 150px 150px;
+  gap: 10px;
+  align-items: center;
+  border: solid rgb(43, 107, 107) 3px;
+  border-radius: 5px;
+  padding: 20px;
+  width: max-content;
+}
+
+nav.dev-mode.box-shadow {
+  box-shadow: 0 .25rem .75rem rgb(0, 255, 159);
+}

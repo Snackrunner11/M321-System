@@ -1,0 +1,56 @@
+# apply production settings:
+# ```
+# docker-compose -f docker-compose.yaml -f docker-compose.production.yaml up
+# ```
+version: '3'
+services:
+  main-server:
+    environment:
+      VIRTUAL_HOST: edu.jakobmeier.ch # Adjust to your domain
+      VIRTUAL_PORT: 8080
+      LETSENCRYPT_HOST: edu.jakobmeier.ch # Adjust to your domain
+  keycloak-db:
+    environment:
+      POSTGRES_PASSWORD: local-dev-dbpw # XXX Overwrite this in production env
+  keycloak:
+    entrypoint: ["/opt/keycloak/bin/kc.sh", "start", "--optimized"]
+    environment:
+      KC_HOSTNAME: auth.jakobmeier.ch
+      KC_HOSTNAME_ADMIN_URL: https://auth.jakobmeier.ch/ # Adjust to your domain
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: LocalDevPas55w0rd # XXX Overwrite this in production env
+      KC_DB_PASSWORD: local-dev-dbpw # XXX Overwrite this in production env
+      KC_PROXY: edge
+      VIRTUAL_HOST: auth.jakobmeier.ch # Adjust to your domain
+      VIRTUAL_PORT: 8080
+      LETSENCRYPT_HOST: auth.jakobmeier.ch # Adjust to your domain
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - certs:/etc/nginx/certs:ro
+      - vhost.d:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./proxy.conf:/etc/nginx/conf.d/my_proxy.conf:ro
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+  letsencrypt:
+    image: nginxproxy/acme-companion
+    environment:
+      DEFAULT_EMAIL: inbox@jakobmeier.ch # Adjust to your email
+    volumes:
+      - certs:/etc/nginx/certs
+      - acme:/etc/acme.sh
+      - vhost.d:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - nginx-proxy
+volumes:
+  certs:
+  acme:
+  vhost.d:
+  html:

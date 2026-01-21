@@ -1,0 +1,53 @@
+version: '3'
+services:
+  main-server:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    build:
+      context: ./main_server
+    ports:
+      - 5085:8080
+      - 5100:5100
+    depends_on:
+      - redis
+  redis:
+    image: redis
+    volumes:
+      - redis_data:/data
+  keycloak-db:
+    image: postgres:16.1-bullseye
+    volumes:
+      - kc_pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: local-dev-dbpw # Overwrite this in production env
+  keycloak:
+    build:
+      context: ./keycloak
+    # entrypoint: ["/opt/keycloak/bin/kc.sh", "start", "--optimized"]
+    environment:
+      KC_HOSTNAME: localhost # Overwrite this in production env
+      KC_HOSTNAME_ADMIN_URL: http://localhost:18080/ # Overwrite this in production env
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: LocalDevPas55w0rd # Overwrite this in production env
+      # proxy settings you might want to set in production env
+      # KC_HOSTNAME_PATH: /keycloak
+      # KC_HOSTNAME_RELATIVE_PATH: /keycloak
+      # KC_PROXY: edge
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db/
+      KC_DB_USER: keycloak
+      KC_DB_SCHEMA: public
+      KC_DB_PASSWORD: local-dev-dbpw # Overwrite this in production env
+      KC_LOG_LELVEL: info
+    ports:
+      - 8443:8443
+      - 18080:8080
+    depends_on:
+      - keycloak-db
+volumes:
+  kc_pg_data:
+    driver: local
+  redis_data:
+    driver: local

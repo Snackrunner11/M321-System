@@ -1,0 +1,53 @@
+﻿@page
+@model PixelBoard.TeacherClient.AdminModel
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<h1>Admin Page</h1>
+
+<h2>Game Controls</h2>
+
+<div class="buttons-container">
+
+    <form method="post" asp-page-handler="Start">
+        <button type="submit">Start Game</button>
+    </form>
+
+    <form method="post" asp-page-handler="Stop">
+        <button type="submit">Stop Game</button>
+    </form>
+
+    <form method="post" asp-page-handler="Reset">
+        <button type="submit">Reset Game</button>
+    </form>
+</div>
+
+<h2>Registered Teams</h2>
+
+<div class="teams-container">
+    @foreach (var team in Model.Teams)
+    {
+        <div class="team">
+            <h3>Team @team.Name (@team.Id)</h3>
+            @foreach (var player in team.Players)
+            {
+                <div>@player.Name</div>
+            }
+        </div>
+    }
+</div>
+
+<h2>Games</h2>
+
+<div class="games-container">
+    <form method="post" asp-page-handler="LoadGame">
+    @foreach (var game in Model.Games)
+    {
+        <div class="game">
+            <div>@game</div>
+            <button name="game" value="@game" type="submit">Load Game</button>
+        </div>
+    }
+    </form>
+</div>

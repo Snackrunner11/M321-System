@@ -1,0 +1,71 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Board";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Pixel Board</h1>
+
+    <div class="board-container">
+        @for (int x = 0; x < Model.Pixels.GetLength(0); x++)
+        {
+            @for (int y = 0; y < Model.Pixels.GetLength(1); y++)
+            {
+                PixelBoard.MainServer.Models.Color? pixel = Model.Pixels[x, y];
+                <div id="pixel-@x-@y" class="pixel" style="background-color: rgb(@pixel?.Red,@pixel?.Green,@pixel?.Blue);">
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const websocket = new WebSocket(`${protocol}://${location.host}/ws-pixels`);
+
+        websocket.addEventListener("open", () => {
+            websocket.send("subscribe");
+        });
+
+        websocket.addEventListener("message", (event) => {
+            if (typeof event.data === "string") {
+                // expecting messages like:
+                //
+                // ```
+                // p
+                // 1 1 255 255 255
+                // 1 2 0 0 0
+                // ```
+                //
+                // The message above would set pixel at (1|1) to
+                // rgb(255,255,255) abd (1|2) to rgb(0,0,0).
+                if (event.data.startsWith('p')) {
+                    var lines = event.data.split('\n');
+                    for (var line of lines) {
+                        if (line === "" || line === "p") {
+                            continue;
+                        }
+                        const numbers = line.split(' ');
+                        if (numbers.length !== 5) {
+                            console.warn("Pixel line malformed", line);
+                        }
+                        // coordinates
+                        const x = numbers[0];
+                        const y = numbers[1];
+                        // colors
+                        const r = numbers[2];
+                        const g = numbers[3];
+                        const b = numbers[4];
+
+                        const element = document.getElementById(`pixel-${x}-${y}`);
+                        if (element) {
+                            element.style.backgroundColor = `rgb(${r},${g},${b})`;
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+}
