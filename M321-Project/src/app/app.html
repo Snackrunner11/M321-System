@@ -1,6 +1,6 @@
 <h1>Pixelboard</h1>
 
-<div *ngIf="selectedPixel" class="info-box">
+<div *ngIf="selectedPixel" style="background: #eee; padding: 10px; margin-bottom: 10px; border: 1px solid #333;">
   Gewähltes Pixel: X: {{ selectedPixel.x }} / Y: {{ selectedPixel.y }}
 </div>
 
@@ -16,5 +16,6 @@
 </div>
 
 <div *ngIf="board.length === 0">
-  Lade Daten vom Backend...
+  <p>Lade Daten vom Backend...</p>
+  <small>(Falls hier nichts passiert: Ist 'Start Game' im Admin Panel gedrückt?)</small>
 </div>
