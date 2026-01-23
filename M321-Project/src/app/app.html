@@ -1,21 +1,46 @@
-<h1>Pixelboard</h1>
-
-<div *ngIf="selectedPixel" style="background: #eee; padding: 10px; margin-bottom: 10px; border: 1px solid #333;">
-  Gewähltes Pixel: X: {{ selectedPixel.x }} / Y: {{ selectedPixel.y }}
-</div>
-
-<div class="board-container" *ngIf="board.length > 0">
-  <div *ngFor="let row of board; index as y">
-    <div 
-      *ngFor="let pixel of row; index as x" 
-      class="pixel"
-      (click)="onPixelClick(x, y)"
-      [style.background-color]="'rgb(' + pixel.Red + ',' + pixel.Green + ',' + pixel.Blue + ')'">
-    </div>
+<div class="app-container">
+  
+  <div *ngIf="isDevMode" class="dev-banner">
+    ⚠️ DEVELOPMENT ENVIRONMENT ⚠️
   </div>
-</div>
 
-<div *ngIf="board.length === 0">
-  <p>Lade Daten vom Backend...</p>
-  <small>(Falls hier nichts passiert: Ist 'Start Game' im Admin Panel gedrückt?)</small>
+  <header>
+    <h1 class="title">Pixelboard</h1>
+    <div class="meta-info">
+      <span class="status-label">⏱️ Board-Ladezeit:</span>
+      <span class="time-badge" [ngClass]="{'fast': loadingTime < 50, 'slow': loadingTime > 200}">
+        {{ loadingTime }} ms
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <div class="control-panel card-entrance">
+      <div class="brush-display">
+        <span class="label">Aktueller Pinsel:</span>
+        <div class="brush-preview" [style.background-color]="currentBrushColor">
+          {{ selectedTeam.Name || 'Lade...' }}
+        </div>
+      </div>
+      <div class="instructions">
+        <span>🖱️ Links: Malen</span> | <span>🖱️ Rechts: Team wechseln</span>
+      </div>
+    </div>
+
+    <div class="board-wrapper card-entrance" *ngIf="board.length > 0">
+      <div class="board-grid" (contextmenu)="onRightClick($event)">
+        <div *ngFor="let row of board; index as y" class="board-row">
+          <div *ngFor="let pixel of row; index as x" 
+               class="pixel"
+               (click)="onLeftClick(x, y)"
+               [style.background-color]="'rgb(' + (pixel.Red||pixel.r||0) + ',' + (pixel.Green||pixel.g||0) + ',' + (pixel.Blue||pixel.b||0) + ')'">
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div *ngIf="board.length === 0" class="loading-state">
+      <div class="spinner"></div><p>Lade Daten...</p>
+    </div>
+  </main>
 </div>
