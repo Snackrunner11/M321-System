@@ -84,7 +84,6 @@ public class PadukGameService : IGameService
                 }
             }
         }
-        _blockedFields.Clear();
         if (_tickCounter % _options.BudgetIncreaseDelay == 0)
         {
             _logger.BudgetIncrease(_tickCounter);
@@ -116,9 +115,10 @@ public class PadukGameService : IGameService
             if (blocked)
             {
                 info.IncrementPaintBudget(1, _options.MaxBudget);
-                throw new InvalidOperationException($"Field ({x}|{y}) has just been played.");
+                throw new InvalidOperationException($"Field ({x}|{y}) is blocked.");
             }
         }
+
         SetField(x, y, team);
 
         // Check if any components have died due to the new move.
@@ -190,6 +190,7 @@ public class PadukGameService : IGameService
     {
         _board[x, y] = null;
         _displayedBoard.DeleteColor(x, y);
+        _blockedFields.Remove((x,y));
     }
 
 

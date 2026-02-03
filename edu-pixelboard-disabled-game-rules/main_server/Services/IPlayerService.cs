@@ -15,5 +15,6 @@ public interface IPlayerService
     Team? GetTeam(int id);
     void SetTeamName(int id, string name);
 
-    void Register(string id, string name, int team);
+    void RegisterPlayer(string id, string name, int teamId);
+    bool RegisterTeam(int teamId, string teamName);
 }

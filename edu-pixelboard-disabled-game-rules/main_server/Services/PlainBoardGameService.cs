@@ -2,7 +2,7 @@ using PixelBoard.MainServer.Models;
 
 namespace PixelBoard.MainServer.Services;
 
-public class PlainBoardGameService : IGameService
+public class PlainBoardGameService : IGameService, IArchiveService
 {
     private readonly ILogger<PlainBoardGameService> _logger;
     private readonly IBoardService _displayedBoard;
@@ -69,6 +69,32 @@ public class PlainBoardGameService : IGameService
     public uint? Lives(int x, int y)
     {
         return 0;
+    }
+
+    public void ArchiveGame(string archiveKey)
+    {
+        _logger.NotImplementedMethod("ArchiveGame");
+    }
+
+    public void LoadGame(string archiveKey)
+    {
+        _logger.NotImplementedMethod("LoadGame");
+    }
+
+    public List<string> GetAllGameKeys()
+    {
+        _logger.NotImplementedMethod("GetAllGameKeys");
+        return new();
+    }
+
+    public void DeleteGame(string archiveKey)
+    {
+        _logger.NotImplementedMethod("DeleteGame");
+    }
+
+    public void InitializeGameFromArchive(string archiveKey)
+    {
+        _logger.NotImplementedMethod("InitializeGameFromArchive");
     }
 }
 

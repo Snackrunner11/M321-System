@@ -6,7 +6,7 @@ using PixelBoard.MainServer.Services;
 
 namespace PixelBoard.TeacherClient;
 
-// [Authorize(Policy = "Admin")]
+[Authorize(Policy = "Admin")]
 public class AdminModel : PageModel
 {
     public List<TeamModel> Teams { get; set; }
@@ -30,11 +30,11 @@ public class AdminModel : PageModel
         return Page();
     }
 
-    public void OnPostStart([FromServices] IGameService game, [FromServices] IPlayerService players)
+    public void OnPostStart(List<int> selectedTeams, [FromServices] IGameService game)
     {
         try
         {
-            game.Start(players.GetAllTeamIds());
+            game.Start(selectedTeams);
             _logger.LogWarning("Game started");
         }
         catch (Exception exception)

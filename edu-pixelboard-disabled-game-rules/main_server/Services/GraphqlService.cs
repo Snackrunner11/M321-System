@@ -11,6 +11,19 @@ public class BoardQuery
         return new(x, y);
     }
 
+    static public GqlPixel[][] PixelRange(GqlRange xRange, GqlRange yRange)
+    {
+        return Enumerable
+            .Range(xRange.Start, xRange.End - xRange.Start + 1)
+            .Select(x =>
+                Enumerable
+                    .Range(yRange.Start, yRange.End - yRange.Start + 1)
+                    .Select(y => new GqlPixel(x, y))
+                    .ToArray()
+            )
+            .ToArray();
+    }
+
     static public GqlTeam? Team([FromServices] IPlayerService players, [FromServices] IGameService game, int id)
     {
         return new(id, players, game);
@@ -91,12 +104,23 @@ public class GqlTeam
 [Name("Player")]
 public class GqlPlayer
 {
-    // public string Id { get; set; }
     public string Name { get; set; }
 
     public GqlPlayer(string name)
     {
-        // this.Id = id;
         this.Name = name;
+    }
+}
+
+[Name("Range")]
+public class GqlRange
+{
+    public int Start { get; set; }
+    public int End { get; set; }
+
+    public GqlRange(int start, int end)
+    {
+        this.Start = start;
+        this.End = end;
     }
 }

@@ -49,7 +49,7 @@ public class PlayerApiController : ControllerBase
 
         try
         {
-            players.Register(id, payload.Name, teamNumber);
+            players.RegisterPlayer(id, payload.Name, teamNumber);
         }
         catch (BadApiRequestException ex)
         {

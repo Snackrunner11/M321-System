@@ -78,3 +78,21 @@ body {
 nav.dev-mode.box-shadow {
   box-shadow: 0 .25rem .75rem rgb(0, 255, 159);
 }
+
+.team {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin: 16px 0;
+}
+
+.student-todo {
+  color: #c9c254;
+  font-size: large;
+  font-weight: bold;
+  margin: 32px 0;
+}
+
+.student-todo-text {
+  font-style: italic;
+  margin: 16px 0;
+}

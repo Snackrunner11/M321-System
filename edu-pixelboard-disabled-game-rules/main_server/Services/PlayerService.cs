@@ -74,20 +74,26 @@ public class PlayerService : IPlayerService
         return JsonSerializer.Deserialize<Team>(s);
     }
 
-    public void Register(string id, string name, int teamId)
+    public void RegisterPlayer(string id, string name, int teamId)
     {
         IDatabase db = _redis.GetConnection();
         if (!db.SetAdd(PlayerIdsDbKey, id))
             throw new BadApiRequestException("player already registered");
 
-        if (db.SetAdd(TeamIdsDbKey, teamId))
-        {
-            Team team = new($"{name}'s team", Color.Palette(teamId));
-            db.StringSet(this.TeamKey(teamId), JsonSerializer.Serialize(team));
-        }
-
         Player player = new(name, teamId);
         db.StringSet(this.PlayerKey(id), JsonSerializer.Serialize(player));
+    }
+
+    public bool RegisterTeam(int teamId, string teamName)
+    {
+        IDatabase db = _redis.GetConnection();
+        if (db.SetAdd(TeamIdsDbKey, teamId))
+        {
+            Team team = new(teamName, Color.Palette(teamId));
+            db.StringSet(this.TeamKey(teamId), JsonSerializer.Serialize(team));
+            return true;
+        }
+        return false;
     }
 
     private string PlayerKey(string playerId)

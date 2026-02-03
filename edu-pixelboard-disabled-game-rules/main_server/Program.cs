@@ -78,22 +78,9 @@ if (game == "Paduk")
 }
 else if (game == "PlainBoard")
 {
-    builder.Services.AddSingleton(services =>
-    {
-        PlainBoardGameService gameService = new(
-            services.GetRequiredService<ILogger<PlainBoardGameService>>(),
-            services.GetRequiredService<IBoardService>()
-        );
-
-        return new RedisEventSourcingGameAdapter(
-            services.GetRequiredService<IRedisDbService>(),
-            gameService,
-            services.GetRequiredService<ILogger<RedisEventSourcingGameAdapter>>()
-        );
-    });
-    builder.Services.AddSingleton<IGameService>(services => services.GetRequiredService<RedisEventSourcingGameAdapter>());
-    builder.Services.AddSingleton<IArchiveService>(services => services.GetRequiredService<RedisEventSourcingGameAdapter>());
-
+    builder.Services.AddSingleton<PlainBoardGameService>();
+    builder.Services.AddSingleton<IGameService>(services => services.GetRequiredService<PlainBoardGameService>());
+    builder.Services.AddSingleton<IArchiveService>(services => services.GetRequiredService<PlainBoardGameService>());
 }
 else
 {
@@ -228,7 +215,6 @@ app.UseForwardedHeaders(forwardingOptions);
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseAntiforgery();
 
 app.UseWebSockets(webSocketOptions);
 app.MapWebSocketHandler("/ws-pixels");

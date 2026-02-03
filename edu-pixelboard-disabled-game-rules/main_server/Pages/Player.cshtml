@@ -1,0 +1,47 @@
+@page
+@model PixelBoard.TeacherClient.PlayerModel
+@{
+    ViewData["Title"] = "Player";
+}
+
+<div class="text-center">
+    <h2>Player</h2>
+    <div>Keycloak ID: @Model.KcName</div>
+    @if (Model.Me is not null)
+    {
+        <div>Gamer Tag: @Model.Me?.Name</div>
+    }
+    else
+    {
+        <div class="student-todo">Kein User im Game gefunden.</div>
+        <div class="student-todo-text">
+            Sie haben sich noch nicht für Paduk registriert.
+            Bisher haben Sie nur eine Keycloak Identität, aber keinen Account im Spiel.
+        </div>
+        <div>
+            Zur Registrierung müssen Sie einen POST auf "api/player/register" machen, mit Ihrem Gamertag den für den Rest
+            der Klasse sichtbar sein wird.
+        </div>
+    }
+
+    <h2>Team</h2>
+    @if (Model.Team is not null)
+    {
+        <div>@Model.Team.Name</div>
+        <div class="pixel"
+            style="background-color: rgb(@Model.Team.Color?.Red,@Model.Team.Color?.Green,@Model.Team.Color?.Blue); margin: 10px auto;">
+        </div>
+
+        <div>Team Id: @Model.Me?.Team</div>
+    }
+    else
+    {
+        <div class="student-todo">Kein Team gefunden</div>
+        <div class="student-todo-text">
+            Ihr Team ist noch nicht im Game registriert.
+        </div>
+        <div>
+            Sie müssen noch einen POST auf "api/team/register" machen, um dem Team einen Namen zu geben.
+        </div>
+    }
+</div>
