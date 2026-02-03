@@ -1,0 +1,21 @@
+{
+  "/api": {
+    "target": "http://127.0.0.1:5085",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/socket.io": {
+    "target": "http://127.0.0.1:5085",
+    "secure": false,
+    "ws": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/realms": {
+    "target": "http://127.0.0.1:18080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

@@ -1,6 +1,8 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { OAuthService } from 'angular-oauth2-oidc';
+import { authConfig } from './app.config';
 import { io, Socket } from 'socket.io-client';
 
 interface Pixel {
@@ -29,8 +31,10 @@ interface BoardResponse {
 })
 export class AppComponent implements OnInit, OnDestroy {
   board: any[][] = [];
-  
   isDevMode = false;
+  
+  // Leer lassen für Proxy
+  private apiUrl = ''; 
 
   teams: Team[] = [
     { ID: 0, Name: 'Team 1 (Gelb)',       Color: { Red: 255, Green: 255, Blue: 0 } },
@@ -55,7 +59,14 @@ export class AppComponent implements OnInit, OnDestroy {
   loadingTime = 0;
   private socket: Socket | undefined;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private oauthService: OAuthService) {
+    this.configureAuth();
+  }
+
+  private configureAuth() {
+    this.oauthService.configure(authConfig);
+    this.oauthService.loadDiscoveryDocumentAndLogin();
+  }
 
   ngOnInit() {
     this.isDevMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -63,10 +74,19 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadBoard();
     setInterval(() => this.loadBoard(), 5000);
 
-    this.socket = io('http://localhost:3000');
-    this.socket.on('pixelUpdate', (data: { x: number, y: number, color: Pixel }) => {
-      this.updateLocalPixel(data.x, data.y, data.color);
-    });
+    try {
+      // Socket Verbindung via Proxy
+      this.socket = io({
+        path: '/socket.io',
+        transports: ['websocket', 'polling']
+      });
+
+      this.socket.on('pixelUpdate', (data: { x: number, y: number, color: Pixel }) => {
+        this.updateLocalPixel(data.x, data.y, data.color);
+      });
+    } catch (e) {
+      console.error("Socket Error", e);
+    }
   }
 
   ngOnDestroy() {
@@ -74,14 +94,20 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   loadBoard() {
-    this.http.get<BoardResponse>('http://localhost:3000/api/board').subscribe({
+    const token = this.oauthService.getAccessToken();
+    let headers = new HttpHeaders();
+    if (token) {
+      headers = headers.set('Authorization', 'Bearer ' + token);
+    }
+
+    this.http.get<BoardResponse>(`${this.apiUrl}/api/board`, { headers }).subscribe({
       next: (data) => {
         if (data.board && data.board.length > 0) {
           this.board = data.board;
           this.loadingTime = data.duration;
         }
       },
-      error: (err) => console.error('Fehler:', err)
+      error: (err) => console.error('Fehler beim Laden des Boards:', err)
     });
   }
 
@@ -89,12 +115,23 @@ export class AppComponent implements OnInit, OnDestroy {
     const team = this.selectedTeam;
     if (!team) return;
 
+    // AUFGABE 4: Token abrufen
+    const token = this.oauthService.getAccessToken();
+    if (!token) {
+      console.warn("Nicht eingeloggt! Kann nicht zeichnen.");
+      return;
+    }
+
+    // AUFGABE 4: Token in den Header packen
+    const headers = new HttpHeaders().set('Authorization', 'Bearer ' + token);
+
     this.updateLocalPixel(x, y, team.Color);
 
     const payload = { x, y, teamId: team.ID };
-    this.http.post('http://localhost:3000/api/pixel', payload).subscribe({
+    
+    this.http.post(`${this.apiUrl}/api/pixel`, payload, { headers }).subscribe({
       next: () => {}, 
-      error: (err) => console.error('Fehler:', err)
+      error: (err) => console.error('Fehler beim Zeichnen:', err)
     });
   }
 
