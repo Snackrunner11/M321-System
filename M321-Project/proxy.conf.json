@@ -5,7 +5,7 @@
     "changeOrigin": true,
     "logLevel": "debug"
   },
-  "/socket.io": {
+  "/ws-pixels": {
     "target": "http://127.0.0.1:5085",
     "secure": false,
     "ws": true,

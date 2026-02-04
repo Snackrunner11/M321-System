@@ -1,10 +1,10 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
-import { io, Socket } from 'socket.io-client';
 
+// Interfaces (angepasst an C# Backend mit PascalCase)
 interface Pixel {
   Red: number;
   Green: number;
@@ -33,8 +33,9 @@ export class AppComponent implements OnInit, OnDestroy {
   board: any[][] = [];
   isDevMode = false;
   
-  // Leer lassen für Proxy
+  // Leerer String -> Nutzt proxy.conf.json
   private apiUrl = ''; 
+  private socket: WebSocket | undefined;
 
   teams: Team[] = [
     { ID: 0, Name: 'Team 1 (Gelb)',       Color: { Red: 255, Green: 255, Blue: 0 } },
@@ -57,9 +58,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   currentTeamIndex = 0;
   loadingTime = 0;
-  private socket: Socket | undefined;
 
-  constructor(private http: HttpClient, private oauthService: OAuthService) {
+  constructor(
+    private http: HttpClient, 
+    private oauthService: OAuthService,
+    private ngZone: NgZone 
+  ) {
     this.configureAuth();
   }
 
@@ -69,70 +73,178 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.isDevMode = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    this.isDevMode = window.location.hostname === 'localhost';
 
-    this.loadBoard();
-    setInterval(() => this.loadBoard(), 5000);
+    // WICHTIG: Board sofort leer erstellen, damit der Lade-Spinner verschwindet!
+    this.initializeEmptyBoard();
 
-    try {
-      // Socket Verbindung via Proxy
-      this.socket = io({
-        path: '/socket.io',
-        transports: ['websocket', 'polling']
-      });
+    // WebSocket verbinden (Native Implementation)
+    this.connectWebSocket();
 
-      this.socket.on('pixelUpdate', (data: { x: number, y: number, color: Pixel }) => {
-        this.updateLocalPixel(data.x, data.y, data.color);
-      });
-    } catch (e) {
-      console.error("Socket Error", e);
-    }
+    // Den HTTP-Load ignorieren wir erstmal, da der Endpoint 404 wirft
+    // this.loadBoard(); 
   }
 
   ngOnDestroy() {
-    if (this.socket) this.socket.disconnect();
+    if (this.socket) {
+      this.socket.close();
+    }
   }
 
+  // --- HILFSFUNKTION: Leeres Board erstellen ---
+  private initializeEmptyBoard() {
+    this.board = [];
+    for (let y = 0; y < 16; y++) {
+      this.board[y] = [];
+      for (let x = 0; x < 16; x++) {
+        // Standardfarbe Dunkelgrau
+        this.board[y][x] = { 
+          Red: 30, Green: 30, Blue: 30,
+          r: 30, g: 30, b: 30 
+        };
+      }
+    }
+  }
+
+  // --- WEBSOCKET LOGIK ---
+  private connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Nutzt den Proxy /ws-pixels -> Backend 5085
+    const wsUrl = `${protocol}//${window.location.host}/ws-pixels`;
+
+    console.log('Verbinde WebSocket:', wsUrl);
+    this.socket = new WebSocket(wsUrl);
+
+    this.socket.onopen = () => {
+      console.log('WebSocket verbunden!');
+      this.socket?.send('subscribe');
+    };
+
+    this.socket.onmessage = (event) => {
+      // Zone.run erzwingt Update der UI
+      this.ngZone.run(() => {
+        this.parsePixelMessage(event.data.toString());
+      });
+    };
+
+    this.socket.onerror = (err) => {
+      console.error('WebSocket Fehler:', err);
+    };
+
+    this.socket.onclose = () => {
+      // Reconnect Versuch nach 3 Sekunden
+      setTimeout(() => this.connectWebSocket(), 3000);
+    };
+  }
+
+  private parsePixelMessage(msg: string) {
+    const lines = msg.split('\n');
+    for (const line of lines) {
+      const parts = line.trim().split(' ');
+      // Erwarte: X Y R G B
+      if (parts.length === 5) {
+        const x = parseInt(parts[0]);
+        const y = parseInt(parts[1]);
+        const r = parseInt(parts[2]);
+        const g = parseInt(parts[3]);
+        const b = parseInt(parts[4]);
+        
+        if (!isNaN(x) && !isNaN(y)) {
+          this.updateLocalPixel(x, y, { Red: r, Green: g, Blue: b });
+        }
+      }
+    }
+  }
+
+  // --- AUFGABE 4: Authentifiziertes Klicken ---
+  onLeftClick(x: number, y: number) {
+    const team = this.selectedTeam;
+    if (!team) return;
+
+    // Token prüfen
+    if (!this.oauthService.hasValidAccessToken()) {
+      console.warn("Nicht eingeloggt! Login wird gestartet...");
+      this.oauthService.initLoginFlow();
+      return;
+    }
+
+    // Optimistisches Update (sofort anzeigen)
+    this.updateLocalPixel(x, y, team.Color);
+
+    // Payload für C# Backend: Properties müssen Grossgeschrieben sein!
+    const payload = { 
+      X: x, 
+      Y: y, 
+      Team: team.ID 
+    };
+    
+    const headers = this.getAuthHeaders();
+    this.http.post(`${this.apiUrl}/api/color`, payload, { headers }).subscribe({
+      next: () => {}, // Erfolgreich gesendet
+      error: (err) => console.error('Fehler beim Zeichnen:', err)
+    });
+  }
+
+  // --- AUFGABE 8: Registrierung ---
+  
+  // 1. Spieler registrieren
+  registerPlayer(gamerTag: string) {
+    if (!gamerTag) return;
+    const payload = { Name: gamerTag }; // Swagger: { "Name": "string" }
+    const headers = this.getAuthHeaders();
+    
+    this.http.post(`${this.apiUrl}/api/player/register`, payload, { headers }).subscribe({
+      next: () => alert('Spieler erfolgreich registriert!'),
+      error: (err) => {
+        console.error(err);
+        alert('Fehler bei Spieler-Registrierung (siehe Konsole)');
+      }
+    });
+  }
+
+  // 2. Team registrieren
+  registerTeam(teamName: string) {
+    if (!teamName) return;
+    // Swagger: Request body ist "string" (JSON String)
+    const payload = JSON.stringify(teamName); 
+    let headers = this.getAuthHeaders().set('Content-Type', 'application/json');
+
+    this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers }).subscribe({
+      next: () => alert('Team erfolgreich registriert!'),
+      error: (err) => {
+        // Fallback für PUT (falls POST nicht geht, wie im PDF erwähnt)
+        console.warn('POST fehlgeschlagen, versuche PUT...', err);
+        this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers }).subscribe({
+            next: () => alert('Team Name (PUT) erfolgreich!'),
+            error: (e) => alert('Fehler bei Team-Registrierung')
+        });
+      }
+    });
+  }
+
+  // --- Helper ---
+
   loadBoard() {
+    // Diese Methode wird aktuell nicht benötigt, da WebSocket Daten liefert
+    // und der REST-Endpunkt /api/board fehlt.
+    /*
+    const headers = this.getAuthHeaders();
+    this.http.get<BoardResponse>(`${this.apiUrl}/api/board`, { headers }).subscribe({
+      next: (data) => {
+        if (data.board) this.board = data.board;
+      },
+      error: (err) => console.error('Load Board Error:', err)
+    });
+    */
+  }
+
+  private getAuthHeaders(): HttpHeaders {
     const token = this.oauthService.getAccessToken();
     let headers = new HttpHeaders();
     if (token) {
       headers = headers.set('Authorization', 'Bearer ' + token);
     }
-
-    this.http.get<BoardResponse>(`${this.apiUrl}/api/board`, { headers }).subscribe({
-      next: (data) => {
-        if (data.board && data.board.length > 0) {
-          this.board = data.board;
-          this.loadingTime = data.duration;
-        }
-      },
-      error: (err) => console.error('Fehler beim Laden des Boards:', err)
-    });
-  }
-
-  onLeftClick(x: number, y: number) {
-    const team = this.selectedTeam;
-    if (!team) return;
-
-    // AUFGABE 4: Token abrufen
-    const token = this.oauthService.getAccessToken();
-    if (!token) {
-      console.warn("Nicht eingeloggt! Kann nicht zeichnen.");
-      return;
-    }
-
-    // AUFGABE 4: Token in den Header packen
-    const headers = new HttpHeaders().set('Authorization', 'Bearer ' + token);
-
-    this.updateLocalPixel(x, y, team.Color);
-
-    const payload = { x, y, teamId: team.ID };
-    
-    this.http.post(`${this.apiUrl}/api/pixel`, payload, { headers }).subscribe({
-      next: () => {}, 
-      error: (err) => console.error('Fehler beim Zeichnen:', err)
-    });
+    return headers;
   }
 
   onRightClick(event: MouseEvent) {
@@ -150,11 +262,16 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private updateLocalPixel(x: number, y: number, color: Pixel) {
-    if (this.board[y] && this.board[y][x]) {
-      const p = this.board[y][x];
-      p.Red = color.Red; p.Green = color.Green; p.Blue = color.Blue;
-      p.r = color.Red; p.g = color.Green; p.b = color.Blue;
-      p.red = color.Red; p.green = color.Green; p.blue = color.Blue;
+    if (!this.board[y]) this.board[y] = []; 
+    // Falls Pixel noch nicht existiert (sollte durch initializeEmptyBoard nicht passieren)
+    if (!this.board[y][x]) {
+        this.board[y][x] = { ...color, r: color.Red, g: color.Green, b: color.Blue };
     }
+
+    const p = this.board[y][x];
+    p.Red = color.Red; p.Green = color.Green; p.Blue = color.Blue;
+    // Template Kompatibilität
+    p.r = color.Red; p.g = color.Green; p.b = color.Blue;
+    p.red = color.Red; p.green = color.Green; p.blue = color.Blue;
   }
 }

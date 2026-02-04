@@ -6,8 +6,10 @@ import { provideOAuthClient, AuthConfig } from 'angular-oauth2-oidc';
 import { routes } from './app.routes';
 
 export const authConfig: AuthConfig = {
-  // Der Pfad für den Proxy
-  issuer: '/realms/pixelboard-test',
+  // WICHTIG: Hier muss die volle URL stehen, nicht der Proxy-Pfad!
+  // Keycloak schreibt diese URL in das Token ("iss"-Claim).
+  // Wenn hier nur '/realms/...' steht, passen Config und Token nicht zusammen -> Login Fehler.
+  issuer: 'http://localhost:18080/realms/pixelboard-test',
   
   redirectUri: window.location.origin,
   clientId: 'student_client',
@@ -16,9 +18,7 @@ export const authConfig: AuthConfig = {
   requireHttps: false, 
   showDebugInformation: true,
   
-  // WICHTIG: Das hier löst Ihren "invalid issuer" Fehler!
-  // Es erlaubt Angular, die Antwort von Keycloak zu akzeptieren, 
-  // auch wenn die URL (localhost:18080) leicht anders aussieht als angefragt (/realms/...).
+  // Erlaubt http statt https
   strictDiscoveryDocumentValidation: false 
 };
 
