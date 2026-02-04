@@ -4,7 +4,6 @@ import { CommonModule } from '@angular/common';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
 
-// Interfaces (angepasst an C# Backend mit PascalCase)
 interface Pixel {
   Red: number;
   Green: number;
@@ -33,7 +32,6 @@ export class AppComponent implements OnInit, OnDestroy {
   board: any[][] = [];
   isDevMode = false;
   
-  // Leerer String -> Nutzt proxy.conf.json
   private apiUrl = ''; 
   private socket: WebSocket | undefined;
 
@@ -74,15 +72,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.isDevMode = window.location.hostname === 'localhost';
-
-    // WICHTIG: Board sofort leer erstellen, damit der Lade-Spinner verschwindet!
     this.initializeEmptyBoard();
-
-    // WebSocket verbinden (Native Implementation)
-    this.connectWebSocket();
-
-    // Den HTTP-Load ignorieren wir erstmal, da der Endpoint 404 wirft
-    // this.loadBoard(); 
+    this.connectWebSocket(); 
   }
 
   ngOnDestroy() {
@@ -91,13 +82,11 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- HILFSFUNKTION: Leeres Board erstellen ---
   private initializeEmptyBoard() {
     this.board = [];
     for (let y = 0; y < 16; y++) {
       this.board[y] = [];
       for (let x = 0; x < 16; x++) {
-        // Standardfarbe Dunkelgrau
         this.board[y][x] = { 
           Red: 30, Green: 30, Blue: 30,
           r: 30, g: 30, b: 30 
@@ -106,10 +95,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- WEBSOCKET LOGIK ---
   private connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Nutzt den Proxy /ws-pixels -> Backend 5085
     const wsUrl = `${protocol}//${window.location.host}/ws-pixels`;
 
     console.log('Verbinde WebSocket:', wsUrl);
@@ -121,7 +108,6 @@ export class AppComponent implements OnInit, OnDestroy {
     };
 
     this.socket.onmessage = (event) => {
-      // Zone.run erzwingt Update der UI
       this.ngZone.run(() => {
         this.parsePixelMessage(event.data.toString());
       });
@@ -132,7 +118,6 @@ export class AppComponent implements OnInit, OnDestroy {
     };
 
     this.socket.onclose = () => {
-      // Reconnect Versuch nach 3 Sekunden
       setTimeout(() => this.connectWebSocket(), 3000);
     };
   }
@@ -141,7 +126,6 @@ export class AppComponent implements OnInit, OnDestroy {
     const lines = msg.split('\n');
     for (const line of lines) {
       const parts = line.trim().split(' ');
-      // Erwarte: X Y R G B
       if (parts.length === 5) {
         const x = parseInt(parts[0]);
         const y = parseInt(parts[1]);
@@ -156,22 +140,18 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- AUFGABE 4: Authentifiziertes Klicken ---
   onLeftClick(x: number, y: number) {
     const team = this.selectedTeam;
     if (!team) return;
 
-    // Token prüfen
     if (!this.oauthService.hasValidAccessToken()) {
       console.warn("Nicht eingeloggt! Login wird gestartet...");
       this.oauthService.initLoginFlow();
       return;
     }
 
-    // Optimistisches Update (sofort anzeigen)
     this.updateLocalPixel(x, y, team.Color);
 
-    // Payload für C# Backend: Properties müssen Grossgeschrieben sein!
     const payload = { 
       X: x, 
       Y: y, 
@@ -180,17 +160,14 @@ export class AppComponent implements OnInit, OnDestroy {
     
     const headers = this.getAuthHeaders();
     this.http.post(`${this.apiUrl}/api/color`, payload, { headers }).subscribe({
-      next: () => {}, // Erfolgreich gesendet
+      next: () => {},
       error: (err) => console.error('Fehler beim Zeichnen:', err)
     });
   }
-
-  // --- AUFGABE 8: Registrierung ---
   
-  // 1. Spieler registrieren
   registerPlayer(gamerTag: string) {
     if (!gamerTag) return;
-    const payload = { Name: gamerTag }; // Swagger: { "Name": "string" }
+    const payload = { Name: gamerTag };
     const headers = this.getAuthHeaders();
     
     this.http.post(`${this.apiUrl}/api/player/register`, payload, { headers }).subscribe({
@@ -202,17 +179,14 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  // 2. Team registrieren
   registerTeam(teamName: string) {
     if (!teamName) return;
-    // Swagger: Request body ist "string" (JSON String)
     const payload = JSON.stringify(teamName); 
     let headers = this.getAuthHeaders().set('Content-Type', 'application/json');
 
     this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers }).subscribe({
       next: () => alert('Team erfolgreich registriert!'),
       error: (err) => {
-        // Fallback für PUT (falls POST nicht geht, wie im PDF erwähnt)
         console.warn('POST fehlgeschlagen, versuche PUT...', err);
         this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers }).subscribe({
             next: () => alert('Team Name (PUT) erfolgreich!'),
@@ -220,22 +194,6 @@ export class AppComponent implements OnInit, OnDestroy {
         });
       }
     });
-  }
-
-  // --- Helper ---
-
-  loadBoard() {
-    // Diese Methode wird aktuell nicht benötigt, da WebSocket Daten liefert
-    // und der REST-Endpunkt /api/board fehlt.
-    /*
-    const headers = this.getAuthHeaders();
-    this.http.get<BoardResponse>(`${this.apiUrl}/api/board`, { headers }).subscribe({
-      next: (data) => {
-        if (data.board) this.board = data.board;
-      },
-      error: (err) => console.error('Load Board Error:', err)
-    });
-    */
   }
 
   private getAuthHeaders(): HttpHeaders {
@@ -263,14 +221,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private updateLocalPixel(x: number, y: number, color: Pixel) {
     if (!this.board[y]) this.board[y] = []; 
-    // Falls Pixel noch nicht existiert (sollte durch initializeEmptyBoard nicht passieren)
     if (!this.board[y][x]) {
         this.board[y][x] = { ...color, r: color.Red, g: color.Green, b: color.Blue };
     }
 
     const p = this.board[y][x];
     p.Red = color.Red; p.Green = color.Green; p.Blue = color.Blue;
-    // Template Kompatibilität
     p.r = color.Red; p.g = color.Green; p.b = color.Blue;
     p.red = color.Red; p.green = color.Green; p.blue = color.Blue;
   }
