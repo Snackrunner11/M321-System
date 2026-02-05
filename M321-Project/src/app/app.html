@@ -7,14 +7,55 @@
   <header>
     <h1 class="title">Pixelboard</h1>
     <div class="meta-info">
-      <span class="status-label">⏱️ Board-Ladezeit:</span>
+      <span class="status-label">⏱️ Ladezeit:</span>
       <span class="time-badge" [ngClass]="{'fast': loadingTime < 50, 'slow': loadingTime > 200}">
         {{ loadingTime }} ms
       </span>
     </div>
   </header>
+  
+  <div *ngIf="errorMessage" class="error-banner">
+    🚨 {{ errorMessage }}
+  </div>
+  
+  <div *ngIf="successMessage" class="success-banner">
+    ✅ {{ successMessage }}
+  </div>
 
   <main>
+    <div class="control-panel card-entrance user-section">
+      <h3>👤 Account & Team</h3>
+      
+      <div *ngIf="!userClaims">
+        <button (click)="oauthService.initLoginFlow()" class="btn-login">
+          🔑 Login mit Keycloak
+        </button>
+      </div>
+
+      <div *ngIf="userClaims">
+        <p class="user-info-text"><strong>Keycloak ID:</strong> {{ userClaims['preferred_username'] }}</p>
+        <p class="user-info-text"><strong>Team Claim:</strong> {{ userClaims['team'] || 'Kein Team' }}</p>
+        
+        <div class="registration-area">
+            <h4>Registrierung (Einmalig)</h4>
+            
+            <div class="reg-row">
+                <input #gamerTagInput placeholder="Dein Gamer Tag" class="input-text">
+                <button (click)="registerPlayer(gamerTagInput.value)" class="btn-action">
+                  Spieler Registrieren
+                </button>
+            </div>
+
+            <div class="reg-row">
+                <input #teamNameInput placeholder="Neuer Team Name" class="input-text">
+                <button (click)="registerTeam(teamNameInput.value)" class="btn-action">
+                  Team Registrieren
+                </button>
+            </div>
+        </div>
+      </div>
+    </div>
+
     <div class="control-panel card-entrance">
       <div class="brush-display">
         <span class="label">Aktueller Pinsel:</span>

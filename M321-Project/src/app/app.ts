@@ -1,9 +1,11 @@
-import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
+import { FormsModule } from '@angular/forms'; 
 
+// Interfaces
 interface Pixel {
   Red: number;
   Green: number;
@@ -16,25 +18,26 @@ interface Team {
   Color: Pixel;
 }
 
-interface BoardResponse {
-  board: Pixel[][];
-  duration: number;
-}
-
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class AppComponent implements OnInit {
   board: any[][] = [];
   isDevMode = false;
   
-  private apiUrl = ''; 
-  private socket: WebSocket | undefined;
+  // HTML Variablen
+  loadingTime = 0;
+  errorMessage: string = '';
+  successMessage: string = '';
+  
+  // URL zum Backend
+  private apiUrl = 'http://localhost:4200'; 
 
+  // --- DEINE TEAMS ---
   teams: Team[] = [
     { ID: 0, Name: 'Team 1 (Gelb)',       Color: { Red: 255, Green: 255, Blue: 0 } },
     { ID: 1, Name: 'Team 2 (Blau)',       Color: { Red: 0, Green: 0, Blue: 255 } },
@@ -54,32 +57,29 @@ export class AppComponent implements OnInit, OnDestroy {
     { ID: 15, Name: 'Team 16 (Tief-Grün)',Color: { Red: 20, Green: 50, Blue: 20 } },
   ];
 
-  currentTeamIndex = 0;
-  loadingTime = 0;
-
   constructor(
     private http: HttpClient, 
-    private oauthService: OAuthService,
-    private ngZone: NgZone 
+    public oauthService: OAuthService
   ) {
     this.configureAuth();
   }
 
-  private configureAuth() {
+  private async configureAuth() {
     this.oauthService.configure(authConfig);
-    this.oauthService.loadDiscoveryDocumentAndLogin();
+    await this.oauthService.loadDiscoveryDocumentAndTryLogin();
+
+    if (this.oauthService.hasValidAccessToken()) {
+      console.log('✅ Login erfolgreich! Token vorhanden.');
+    }
   }
 
   ngOnInit() {
     this.isDevMode = window.location.hostname === 'localhost';
     this.initializeEmptyBoard();
-    this.connectWebSocket(); 
   }
 
-  ngOnDestroy() {
-    if (this.socket) {
-      this.socket.close();
-    }
+  get userClaims(): any {
+    return this.oauthService.getIdentityClaims();
   }
 
   private initializeEmptyBoard() {
@@ -87,147 +87,128 @@ export class AppComponent implements OnInit, OnDestroy {
     for (let y = 0; y < 16; y++) {
       this.board[y] = [];
       for (let x = 0; x < 16; x++) {
-        this.board[y][x] = { 
-          Red: 30, Green: 30, Blue: 30,
-          r: 30, g: 30, b: 30 
-        };
+        this.board[y][x] = { Red: 30, Green: 30, Blue: 30, r: 30, g: 30, b: 30 };
       }
     }
   }
 
-  private connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws-pixels`;
-
-    console.log('Verbinde WebSocket:', wsUrl);
-    this.socket = new WebSocket(wsUrl);
-
-    this.socket.onopen = () => {
-      console.log('WebSocket verbunden!');
-      this.socket?.send('subscribe');
-    };
-
-    this.socket.onmessage = (event) => {
-      this.ngZone.run(() => {
-        this.parsePixelMessage(event.data.toString());
-      });
-    };
-
-    this.socket.onerror = (err) => {
-      console.error('WebSocket Fehler:', err);
-    };
-
-    this.socket.onclose = () => {
-      setTimeout(() => this.connectWebSocket(), 3000);
-    };
-  }
-
-  private parsePixelMessage(msg: string) {
-    const lines = msg.split('\n');
-    for (const line of lines) {
-      const parts = line.trim().split(' ');
-      if (parts.length === 5) {
-        const x = parseInt(parts[0]);
-        const y = parseInt(parts[1]);
-        const r = parseInt(parts[2]);
-        const g = parseInt(parts[3]);
-        const b = parseInt(parts[4]);
-        
-        if (!isNaN(x) && !isNaN(y)) {
-          this.updateLocalPixel(x, y, { Red: r, Green: g, Blue: b });
-        }
-      }
+  // Garantie gegen "Undefined" Fehler
+  get selectedTeam(): Team {
+    const claims = this.userClaims;
+    if (claims && claims['team'] !== undefined) {
+      const found = this.teams.find(t => t.ID == claims['team']);
+      if (found) return found;
     }
+    return this.teams[0];
   }
 
+  get currentBrushColor(): string {
+    const t = this.selectedTeam;
+    const c = t ? t.Color : { Red: 255, Green: 255, Blue: 255 };
+    return `rgb(${c.Red}, ${c.Green}, ${c.Blue})`;
+  }
+
+  // --- HIER IST DER FIX (responseType: 'text') ---
   onLeftClick(x: number, y: number) {
-    const team = this.selectedTeam;
-    if (!team) return;
+    this.errorMessage = '';
 
     if (!this.oauthService.hasValidAccessToken()) {
-      console.warn("Nicht eingeloggt! Login wird gestartet...");
-      this.oauthService.initLoginFlow();
+      this.oauthService.initCodeFlow();
       return;
     }
 
-    this.updateLocalPixel(x, y, team.Color);
+    const claims = this.oauthService.getIdentityClaims() as any;
+    const myTeamId = claims ? claims['team'] : null;
+
+    if (myTeamId === null || myTeamId === undefined) {
+      this.errorMessage = "Fehler: Kein Team im Token!";
+      return;
+    }
+
+    // Lokales Update
+    const myTeam = this.teams.find(t => t.ID == myTeamId);
+    if (myTeam) this.updateLocalPixel(x, y, myTeam.Color);
 
     const payload = { 
       X: x, 
       Y: y, 
-      Team: team.ID 
+      Team: myTeamId 
     };
     
     const headers = this.getAuthHeaders();
-    this.http.post(`${this.apiUrl}/api/color`, payload, { headers }).subscribe({
-      next: () => {},
-      error: (err) => console.error('Fehler beim Zeichnen:', err)
+    
+    // WICHTIG: responseType: 'text' verhindert den "Unexpected token O" Fehler
+    this.http.post(`${this.apiUrl}/api/color`, payload, { headers, responseType: 'text' }).subscribe({
+      next: (response) => console.log('Pixel erfolgreich gesendet!', response),
+      error: (err) => {
+        console.error('Fehler:', err);
+        // Wir zeigen den Fehler nur an, wenn es KEIN "OK"-Text Fehler ist (falls er doch durchrutscht)
+        if (err.status !== 200) {
+            this.errorMessage = err.error || err.message;
+        }
+      }
     });
   }
-  
+
   registerPlayer(gamerTag: string) {
     if (!gamerTag) return;
+    this.errorMessage = '';
+    
     const payload = { Name: gamerTag };
     const headers = this.getAuthHeaders();
     
-    this.http.post(`${this.apiUrl}/api/player/register`, payload, { headers }).subscribe({
-      next: () => alert('Spieler erfolgreich registriert!'),
-      error: (err) => {
-        console.error(err);
-        alert('Fehler bei Spieler-Registrierung (siehe Konsole)');
-      }
+    // Auch hier 'text', falls der Server einfach "Success" oder eine Zahl als Text zurückgibt
+    this.http.post(`${this.apiUrl}/api/player/register`, payload, { headers, responseType: 'text' }).subscribe({
+      next: () => {
+        this.successMessage = `Spieler '${gamerTag}' registriert!`;
+        this.oauthService.initCodeFlow();
+      },
+      error: (err) => this.handleError(err)
     });
   }
 
   registerTeam(teamName: string) {
     if (!teamName) return;
-    const payload = JSON.stringify(teamName); 
+    this.errorMessage = '';
+    
+    const payload = JSON.stringify(teamName);
     let headers = this.getAuthHeaders().set('Content-Type', 'application/json');
 
-    this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers }).subscribe({
-      next: () => alert('Team erfolgreich registriert!'),
+    this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers, responseType: 'text' }).subscribe({
+      next: () => this.successMessage = `Team '${teamName}' registriert!`,
       error: (err) => {
-        console.warn('POST fehlgeschlagen, versuche PUT...', err);
-        this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers }).subscribe({
-            next: () => alert('Team Name (PUT) erfolgreich!'),
-            error: (e) => alert('Fehler bei Team-Registrierung')
+        // Fallback PUT
+        this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers, responseType: 'text' }).subscribe({
+            next: () => this.successMessage = `Team Name geändert!`,
+            error: (e) => this.handleError(e)
         });
       }
     });
   }
 
-  private getAuthHeaders(): HttpHeaders {
-    const token = this.oauthService.getAccessToken();
-    let headers = new HttpHeaders();
-    if (token) {
-      headers = headers.set('Authorization', 'Bearer ' + token);
-    }
-    return headers;
-  }
-
   onRightClick(event: MouseEvent) {
     event.preventDefault();
-    this.currentTeamIndex = (this.currentTeamIndex + 1) % this.teams.length;
   }
 
-  get selectedTeam(): Team {
-    return this.teams[this.currentTeamIndex];
+  private handleError(err: any) {
+    // Ignoriere Parsing Fehler bei Status 200
+    if (err.status === 200) return;
+    this.errorMessage = err.error || err.message || "Fehler";
   }
 
-  get currentBrushColor(): string {
-    const c = this.selectedTeam.Color;
-    return `rgb(${c.Red}, ${c.Green}, ${c.Blue})`;
+  private getAuthHeaders(): HttpHeaders {
+    const token = this.oauthService.getAccessToken();
+    return new HttpHeaders().set('Authorization', 'Bearer ' + token);
   }
 
   private updateLocalPixel(x: number, y: number, color: Pixel) {
-    if (!this.board[y]) this.board[y] = []; 
-    if (!this.board[y][x]) {
-        this.board[y][x] = { ...color, r: color.Red, g: color.Green, b: color.Blue };
+    if (this.board[y] && this.board[y][x]) {
+       this.board[y][x] = { 
+         ...color, 
+         r: color.Red, g: color.Green, b: color.Blue,
+         red: color.Red, green: color.Green, blue: color.Blue,
+         Red: color.Red, Green: color.Green, Blue: color.Blue
+       }; 
     }
-
-    const p = this.board[y][x];
-    p.Red = color.Red; p.Green = color.Green; p.Blue = color.Blue;
-    p.r = color.Red; p.g = color.Green; p.b = color.Blue;
-    p.red = color.Red; p.green = color.Green; p.blue = color.Blue;
   }
 }

@@ -73,6 +73,11 @@
   gap: 5px;
 }
 
+/* User Section Utility Class */
+.user-section {
+  margin-bottom: 10px;
+}
+
 .brush-display {
   display: flex;
   align-items: center;
@@ -199,4 +204,78 @@
   letter-spacing: 2px;
   z-index: 1000;
   text-transform: uppercase;
+}
+
+/* New UI Elements for Errors and Registration */
+.error-banner {
+  background-color: #ff4444;
+  color: white;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.success-banner {
+  background-color: #44ff44;
+  color: black;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.btn-login {
+  padding: 10px 20px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+.btn-login:hover { background: #0056b3; }
+
+.user-info-text {
+  margin: 5px 0;
+}
+
+.registration-area {
+  margin-top: 15px;
+  border-top: 1px solid #444;
+  padding-top: 15px;
+}
+
+.reg-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  justify-content: center;
+}
+
+.input-text {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #222;
+  color: white;
+  flex: 1;
+  max-width: 150px;
+}
+
+.btn-action {
+  padding: 8px 15px;
+  background: #333344;
+  color: white;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-action:hover {
+  background: #444455;
+  border-color: #777;
 }
