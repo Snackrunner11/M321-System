@@ -13,6 +13,19 @@ import { AppService, Team } from './app.service';
 import { BoardStateService } from './board-state.service';
 import { EventsGateway } from './events.gateway';
 
+// 1. Wir definieren ein Interface für den User (passend zur JwtStrategy)
+interface UserPayload {
+  userId: string;
+  username?: string;
+  email?: string;
+  team?: number;
+}
+
+// 2. Wir definieren den Request-Typ, der diesen User enthält
+interface RequestWithUser extends Request {
+  user: UserPayload;
+}
+
 @Controller('api')
 export class AppController implements OnModuleInit {
   private readonly logger = new Logger(AppController.name);
@@ -27,13 +40,11 @@ export class AppController implements OnModuleInit {
     await this.appService.getTeams();
   }
 
-  // JEDER darf die Teams sehen
   @Get('teams')
   async getTeams(): Promise<Team[]> {
     return await this.appService.getTeams();
   }
 
-  // JEDER darf das Board sehen
   @Get('board')
   getBoard() {
     return {
@@ -42,17 +53,13 @@ export class AppController implements OnModuleInit {
     };
   }
 
-  // NUR EINGELOGGTE USER dürfen malen
-  // Das beantwortet die Frage nach dem Login Zwang
   @UseGuards(AuthGuard('jwt'))
   @Post('pixel')
   async setPixel(
     @Body() body: { x: number; y: number; teamId: number },
-    @Request() req: any, // 'any' verhindert Typfehler beim Zugriff auf .user
+    // 3. Hier verwenden wir jetzt den echten Typ statt 'any'
+    @Request() req: RequestWithUser,
   ) {
-    // HIER IST DER FIX:
-    // Wir greifen auf 'req.user' zu. Damit ist 'req' benutzt und der Fehler ist weg.
-    // Gleichzeitig siehst du im Server Log, wer gemalt hat.
     const user = req.user;
     this.logger.log(`Pixel gesetzt von User: ${user?.username || 'Unbekannt'}`);
 

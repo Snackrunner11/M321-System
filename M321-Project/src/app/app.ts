@@ -55,6 +55,7 @@ export class AppComponent implements OnInit {
 
     if (this.oauthService.hasValidAccessToken()) {
       console.log('✅ Login erfolgreich! Token bereit.');
+      console.log('Mein dekodiertes ID-Token:', this.oauthService.getIdentityClaims());
     }
   }
 

@@ -1,19 +1,20 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config'; // <--- NEU
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { BoardStateService } from './board-state.service';
-import { EventsGateway } from './events.gateway';
 import { AuthModule } from './auth/auth.module';
+import { EventsGateway } from './events.gateway';
+import { BoardStateService } from './board-state.service';
 
 @Module({
   imports: [
+    // Lädt die .env Datei global für die ganze App
     ConfigModule.forRoot({
       isGlobal: true,
     }),
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService, BoardStateService, EventsGateway],
+  providers: [AppService, EventsGateway, BoardStateService],
 })
 export class AppModule {}
