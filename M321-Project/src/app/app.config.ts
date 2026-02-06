@@ -5,9 +5,9 @@ import { provideOAuthClient, AuthConfig } from 'angular-oauth2-oidc';
 
 import { routes } from './app.routes';
 import { errorInterceptor } from './error.interceptor';
-import { environment } from '../environments/environment'; // <--- Importieren
+import { environment } from '../environments/environment';
 
-// Die Config holt sich jetzt die Daten aus der environment Datei
+// Die Config holt die Daten aus der environment Datei
 export const authConfig: AuthConfig = {
   issuer: environment.keycloak.issuer,
   redirectUri: window.location.origin,

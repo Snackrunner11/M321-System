@@ -23,7 +23,6 @@ export class AppComponent implements OnInit {
   errorMessage: string = '';
   successMessage: string = '';
   
-  // Leer lassen, damit der Proxy (localhost:4200 -> localhost:5085) genutzt wird
   private apiUrl = ''; 
 
   teams: Team[] = [
@@ -63,10 +62,7 @@ export class AppComponent implements OnInit {
     this.isDevMode = window.location.hostname === 'localhost';
     this.initializeEmptyBoard();
   }
-
-  // --- HILFSFUNKTIONEN ---
   
-  // Falls Tokens klemmen: Alles löschen
   hardReset() {
     this.oauthService.logOut();
     localStorage.clear();
@@ -84,7 +80,6 @@ export class AppComponent implements OnInit {
       const found = this.teams.find(t => t.ID == claims['team']);
       if (found) return found;
     }
-    // Fallback, falls noch kein Team zugewiesen ist
     return { ID: -1, Name: 'Kein Team', Color: { Red: 128, Green: 128, Blue: 128 } };
   }
 
@@ -111,13 +106,10 @@ export class AppComponent implements OnInit {
       return;
     }
 
-    // 1. Lokal sofort malen (für Geschwindigkeit)
     const myTeam = this.teams.find(t => t.ID == myTeamId);
     if (myTeam) this.updateLocalPixel(x, y, myTeam.Color);
 
-    // 2. An Server senden
     const payload = { X: x, Y: y, Team: myTeamId };
-    // Content-Type ist hier wichtig, damit der Server das JSON versteht
     const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
     
     this.http.post(`${this.apiUrl}/api/color`, payload, { headers, responseType: 'text' }).subscribe({
@@ -136,7 +128,7 @@ export class AppComponent implements OnInit {
     this.errorMessage = '';
     
     const payload = { Name: gamerTag };
-    const headers = this.getAuthHeaders(); // Content-Type wird von Angular bei Objekten oft automatisch gesetzt, aber sicherheitshalber:
+    const headers = this.getAuthHeaders();
     
     this.http.post(`${this.apiUrl}/api/player/register`, payload, { 
       headers: headers.set('Content-Type', 'application/json'), 
@@ -144,8 +136,6 @@ export class AppComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.successMessage = `Spieler '${gamerTag}' registriert!`;
-        // Token erneuern, falls der Server Claims ändert (selten nötig, aber gut)
-        // this.oauthService.initCodeFlow(); 
       },
       error: (err) => this.handleError(err)
     });
@@ -155,14 +145,12 @@ export class AppComponent implements OnInit {
     if (!teamName) return;
     this.errorMessage = '';
     
-    // API erwartet einen String als JSON Body: "TeamName"
     const payload = JSON.stringify(teamName);
     const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
 
     this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers, responseType: 'text' }).subscribe({
       next: () => this.successMessage = `Team '${teamName}' registriert!`,
       error: (err) => {
-        // Falls POST fehlschlägt (Team existiert schon), versuchen wir PUT (Namen ändern)
         console.log("POST fehlgeschlagen, versuche PUT...");
         this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers, responseType: 'text' }).subscribe({
             next: () => this.successMessage = `Team Name in '${teamName}' geändert!`,
@@ -173,13 +161,11 @@ export class AppComponent implements OnInit {
   }
 
   onRightClick(event: MouseEvent) {
-    event.preventDefault(); // Kontextmenü unterdrücken
+    event.preventDefault();
   }
 
-  // --- HELPER ---
-
   private handleError(err: any) {
-    if (err.status === 200) return; // Manchmal wirft Angular Fehler trotz 200 OK beim Parsen
+    if (err.status === 200) return;
     this.errorMessage = err.error || err.message || "Unbekannter Fehler";
   }
 

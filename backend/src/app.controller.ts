@@ -13,7 +13,6 @@ import { AppService, Team } from './app.service';
 import { BoardStateService } from './board-state.service';
 import { EventsGateway } from './events.gateway';
 
-// 1. Wir definieren ein Interface für den User (passend zur JwtStrategy)
 interface UserPayload {
   userId: string;
   username?: string;
@@ -21,7 +20,6 @@ interface UserPayload {
   team?: number;
 }
 
-// 2. Wir definieren den Request-Typ, der diesen User enthält
 interface RequestWithUser extends Request {
   user: UserPayload;
 }
@@ -57,7 +55,6 @@ export class AppController implements OnModuleInit {
   @Post('pixel')
   async setPixel(
     @Body() body: { x: number; y: number; teamId: number },
-    // 3. Hier verwenden wir jetzt den echten Typ statt 'any'
     @Request() req: RequestWithUser,
   ) {
     const user = req.user;

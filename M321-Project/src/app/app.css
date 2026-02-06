@@ -73,7 +73,6 @@
   gap: 5px;
 }
 
-/* User Section Utility Class */
 .user-section {
   margin-bottom: 10px;
 }
@@ -206,7 +205,6 @@
   text-transform: uppercase;
 }
 
-/* New UI Elements for Errors and Registration */
 .error-banner {
   background-color: #ff4444;
   color: white;
