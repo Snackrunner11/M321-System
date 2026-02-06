@@ -5,18 +5,8 @@ import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
 import { FormsModule } from '@angular/forms'; 
 
-// Interfaces
-interface Pixel {
-  Red: number;
-  Green: number;
-  Blue: number;
-}
-
-interface Team {
-  ID: number;
-  Name: string;
-  Color: Pixel;
-}
+interface Pixel { Red: number; Green: number; Blue: number; }
+interface Team { ID: number; Name: string; Color: Pixel; }
 
 @Component({
   selector: 'app-root',
@@ -29,15 +19,13 @@ export class AppComponent implements OnInit {
   board: any[][] = [];
   isDevMode = false;
   
-  // HTML Variablen
   loadingTime = 0;
   errorMessage: string = '';
   successMessage: string = '';
   
-  // URL zum Backend
-  private apiUrl = 'http://localhost:4200'; 
+  // Leer lassen, damit der Proxy (localhost:4200 -> localhost:5085) genutzt wird
+  private apiUrl = ''; 
 
-  // --- DEINE TEAMS ---
   teams: Team[] = [
     { ID: 0, Name: 'Team 1 (Gelb)',       Color: { Red: 255, Green: 255, Blue: 0 } },
     { ID: 1, Name: 'Team 2 (Blau)',       Color: { Red: 0, Green: 0, Blue: 255 } },
@@ -57,10 +45,7 @@ export class AppComponent implements OnInit {
     { ID: 15, Name: 'Team 16 (Tief-Grün)',Color: { Red: 20, Green: 50, Blue: 20 } },
   ];
 
-  constructor(
-    private http: HttpClient, 
-    public oauthService: OAuthService
-  ) {
+  constructor(private http: HttpClient, public oauthService: OAuthService) {
     this.configureAuth();
   }
 
@@ -69,7 +54,7 @@ export class AppComponent implements OnInit {
     await this.oauthService.loadDiscoveryDocumentAndTryLogin();
 
     if (this.oauthService.hasValidAccessToken()) {
-      console.log('✅ Login erfolgreich! Token vorhanden.');
+      console.log('✅ Login erfolgreich! Token bereit.');
     }
   }
 
@@ -78,37 +63,37 @@ export class AppComponent implements OnInit {
     this.initializeEmptyBoard();
   }
 
+  // --- HILFSFUNKTIONEN ---
+  
+  // Falls Tokens klemmen: Alles löschen
+  hardReset() {
+    this.oauthService.logOut();
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  }
+
   get userClaims(): any {
     return this.oauthService.getIdentityClaims();
   }
 
-  private initializeEmptyBoard() {
-    this.board = [];
-    for (let y = 0; y < 16; y++) {
-      this.board[y] = [];
-      for (let x = 0; x < 16; x++) {
-        this.board[y][x] = { Red: 30, Green: 30, Blue: 30, r: 30, g: 30, b: 30 };
-      }
-    }
-  }
-
-  // Garantie gegen "Undefined" Fehler
   get selectedTeam(): Team {
     const claims = this.userClaims;
     if (claims && claims['team'] !== undefined) {
       const found = this.teams.find(t => t.ID == claims['team']);
       if (found) return found;
     }
-    return this.teams[0];
+    // Fallback, falls noch kein Team zugewiesen ist
+    return { ID: -1, Name: 'Kein Team', Color: { Red: 128, Green: 128, Blue: 128 } };
   }
 
   get currentBrushColor(): string {
-    const t = this.selectedTeam;
-    const c = t ? t.Color : { Red: 255, Green: 255, Blue: 255 };
+    const c = this.selectedTeam.Color;
     return `rgb(${c.Red}, ${c.Green}, ${c.Blue})`;
   }
 
-  // --- HIER IST DER FIX (responseType: 'text') ---
+  // --- API AKTIONEN ---
+
   onLeftClick(x: number, y: number) {
     this.errorMessage = '';
 
@@ -117,34 +102,29 @@ export class AppComponent implements OnInit {
       return;
     }
 
-    const claims = this.oauthService.getIdentityClaims() as any;
+    const claims = this.userClaims;
     const myTeamId = claims ? claims['team'] : null;
 
     if (myTeamId === null || myTeamId === undefined) {
-      this.errorMessage = "Fehler: Kein Team im Token!";
+      this.errorMessage = "Fehler: Kein Team im Token! Bist du in Keycloak der Gruppe zugewiesen?";
       return;
     }
 
-    // Lokales Update
+    // 1. Lokal sofort malen (für Geschwindigkeit)
     const myTeam = this.teams.find(t => t.ID == myTeamId);
     if (myTeam) this.updateLocalPixel(x, y, myTeam.Color);
 
-    const payload = { 
-      X: x, 
-      Y: y, 
-      Team: myTeamId 
-    };
+    // 2. An Server senden
+    const payload = { X: x, Y: y, Team: myTeamId };
+    // Content-Type ist hier wichtig, damit der Server das JSON versteht
+    const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
     
-    const headers = this.getAuthHeaders();
-    
-    // WICHTIG: responseType: 'text' verhindert den "Unexpected token O" Fehler
     this.http.post(`${this.apiUrl}/api/color`, payload, { headers, responseType: 'text' }).subscribe({
-      next: (response) => console.log('Pixel erfolgreich gesendet!', response),
+      next: (response) => console.log('Pixel gesendet:', response),
       error: (err) => {
-        console.error('Fehler:', err);
-        // Wir zeigen den Fehler nur an, wenn es KEIN "OK"-Text Fehler ist (falls er doch durchrutscht)
+        console.error('Fehler beim Malen:', err);
         if (err.status !== 200) {
-            this.errorMessage = err.error || err.message;
+            this.errorMessage = "Server Fehler: " + (err.error || err.message || err.statusText);
         }
       }
     });
@@ -155,13 +135,16 @@ export class AppComponent implements OnInit {
     this.errorMessage = '';
     
     const payload = { Name: gamerTag };
-    const headers = this.getAuthHeaders();
+    const headers = this.getAuthHeaders(); // Content-Type wird von Angular bei Objekten oft automatisch gesetzt, aber sicherheitshalber:
     
-    // Auch hier 'text', falls der Server einfach "Success" oder eine Zahl als Text zurückgibt
-    this.http.post(`${this.apiUrl}/api/player/register`, payload, { headers, responseType: 'text' }).subscribe({
+    this.http.post(`${this.apiUrl}/api/player/register`, payload, { 
+      headers: headers.set('Content-Type', 'application/json'), 
+      responseType: 'text' 
+    }).subscribe({
       next: () => {
         this.successMessage = `Spieler '${gamerTag}' registriert!`;
-        this.oauthService.initCodeFlow();
+        // Token erneuern, falls der Server Claims ändert (selten nötig, aber gut)
+        // this.oauthService.initCodeFlow(); 
       },
       error: (err) => this.handleError(err)
     });
@@ -171,15 +154,17 @@ export class AppComponent implements OnInit {
     if (!teamName) return;
     this.errorMessage = '';
     
+    // API erwartet einen String als JSON Body: "TeamName"
     const payload = JSON.stringify(teamName);
-    let headers = this.getAuthHeaders().set('Content-Type', 'application/json');
+    const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
 
     this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers, responseType: 'text' }).subscribe({
       next: () => this.successMessage = `Team '${teamName}' registriert!`,
       error: (err) => {
-        // Fallback PUT
+        // Falls POST fehlschlägt (Team existiert schon), versuchen wir PUT (Namen ändern)
+        console.log("POST fehlgeschlagen, versuche PUT...");
         this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers, responseType: 'text' }).subscribe({
-            next: () => this.successMessage = `Team Name geändert!`,
+            next: () => this.successMessage = `Team Name in '${teamName}' geändert!`,
             error: (e) => this.handleError(e)
         });
       }
@@ -187,28 +172,35 @@ export class AppComponent implements OnInit {
   }
 
   onRightClick(event: MouseEvent) {
-    event.preventDefault();
+    event.preventDefault(); // Kontextmenü unterdrücken
   }
 
+  // --- HELPER ---
+
   private handleError(err: any) {
-    // Ignoriere Parsing Fehler bei Status 200
-    if (err.status === 200) return;
-    this.errorMessage = err.error || err.message || "Fehler";
+    if (err.status === 200) return; // Manchmal wirft Angular Fehler trotz 200 OK beim Parsen
+    this.errorMessage = err.error || err.message || "Unbekannter Fehler";
   }
 
   private getAuthHeaders(): HttpHeaders {
     const token = this.oauthService.getAccessToken();
+    if (!token) console.warn("Achtung: Kein Token gefunden!");
     return new HttpHeaders().set('Authorization', 'Bearer ' + token);
+  }
+
+  private initializeEmptyBoard() {
+    this.board = [];
+    for (let y = 0; y < 16; y++) {
+      this.board[y] = [];
+      for (let x = 0; x < 16; x++) {
+        this.board[y][x] = { Red: 30, Green: 30, Blue: 30 };
+      }
+    }
   }
 
   private updateLocalPixel(x: number, y: number, color: Pixel) {
     if (this.board[y] && this.board[y][x]) {
-       this.board[y][x] = { 
-         ...color, 
-         r: color.Red, g: color.Green, b: color.Blue,
-         red: color.Red, green: color.Green, blue: color.Blue,
-         Red: color.Red, Green: color.Green, Blue: color.Blue
-       }; 
+       this.board[y][x] = { ...color }; 
     }
   }
 }

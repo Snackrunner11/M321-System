@@ -5,7 +5,10 @@ import {
   Body,
   OnModuleInit,
   Logger,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { AppService, Team } from './app.service';
 import { BoardStateService } from './board-state.service';
 import { EventsGateway } from './events.gateway';
@@ -24,11 +27,13 @@ export class AppController implements OnModuleInit {
     await this.appService.getTeams();
   }
 
+  // JEDER darf die Teams sehen
   @Get('teams')
   async getTeams(): Promise<Team[]> {
     return await this.appService.getTeams();
   }
 
+  // JEDER darf das Board sehen
   @Get('board')
   getBoard() {
     return {
@@ -37,8 +42,20 @@ export class AppController implements OnModuleInit {
     };
   }
 
+  // NUR EINGELOGGTE USER dürfen malen
+  // Das beantwortet die Frage nach dem Login Zwang
+  @UseGuards(AuthGuard('jwt'))
   @Post('pixel')
-  async setPixel(@Body() body: { x: number; y: number; teamId: number }) {
+  async setPixel(
+    @Body() body: { x: number; y: number; teamId: number },
+    @Request() req: any, // 'any' verhindert Typfehler beim Zugriff auf .user
+  ) {
+    // HIER IST DER FIX:
+    // Wir greifen auf 'req.user' zu. Damit ist 'req' benutzt und der Fehler ist weg.
+    // Gleichzeitig siehst du im Server Log, wer gemalt hat.
+    const user = req.user;
+    this.logger.log(`Pixel gesetzt von User: ${user?.username || 'Unbekannt'}`);
+
     await this.appService.setPixel(body.x, body.y, body.teamId);
 
     const teams = await this.appService.getTeams();

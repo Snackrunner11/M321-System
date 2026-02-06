@@ -6,20 +6,22 @@ import { provideOAuthClient, AuthConfig } from 'angular-oauth2-oidc';
 import { routes } from './app.routes';
 
 export const authConfig: AuthConfig = {
-  // Wir verbinden uns mit deinem LOKALEN Keycloak
+  // Adresse des lokalen Keycloak Servers
   issuer: 'http://localhost:18080/realms/pixelboard-test',
   
   redirectUri: window.location.origin,
   clientId: 'student_client',
   
-  // Dein lokales Secret, das du gerade gefunden hast:
+  // Dein lokales Secret (korrekt)
   dummyClientSecret: 'W3O3oYj1Qny3ATcvE6nrozLe17KyW6e9',
 
   responseType: 'code',
-  scope: 'openid profile',
   
-  // Lokal ist HTTPS aus, wichtig für Docker/Localhost
-  requireHttps: false, 
+  // WICHTIG: Nur 'openid'. Kein 'profile', kein 'email'.
+  // Das verhindert den "Audience is invalid" Fehler!
+  scope: 'openid',
+  
+  requireHttps: false,
   showDebugInformation: true,
   strictDiscoveryDocumentValidation: false 
 };
