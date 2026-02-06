@@ -1,9 +1,10 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideOAuthClient, AuthConfig } from 'angular-oauth2-oidc';
 
 import { routes } from './app.routes';
+import { errorInterceptor } from './error.interceptor';
 
 export const authConfig: AuthConfig = {
   // Adresse des lokalen Keycloak Servers
@@ -12,13 +13,12 @@ export const authConfig: AuthConfig = {
   redirectUri: window.location.origin,
   clientId: 'student_client',
   
-  // Dein lokales Secret (korrekt)
+  // Dein lokales Secret
   dummyClientSecret: 'W3O3oYj1Qny3ATcvE6nrozLe17KyW6e9',
 
   responseType: 'code',
   
   // WICHTIG: Nur 'openid'. Kein 'profile', kein 'email'.
-  // Das verhindert den "Audience is invalid" Fehler!
   scope: 'openid',
   
   requireHttps: false,
@@ -30,7 +30,10 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(),
+    
+    // Hier wird der Fehler Wächter registriert
+    provideHttpClient(withInterceptors([errorInterceptor])),
+    
     provideOAuthClient()
   ]
 };

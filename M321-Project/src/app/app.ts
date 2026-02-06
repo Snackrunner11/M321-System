@@ -96,7 +96,7 @@ export class AppComponent implements OnInit {
 
   onLeftClick(x: number, y: number) {
     this.errorMessage = '';
-
+    
     if (!this.oauthService.hasValidAccessToken()) {
       this.oauthService.initCodeFlow();
       return;
