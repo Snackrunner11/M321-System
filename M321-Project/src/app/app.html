@@ -4,12 +4,17 @@
     ⚠️ DEVELOPMENT ENVIRONMENT ⚠️
   </div>
 
-  <header>
+<header>
     <h1 class="title">Pixelboard</h1>
     <div class="meta-info">
       <span class="status-label">⏱️ Ladezeit:</span>
       <span class="time-badge" [ngClass]="{'fast': loadingTime < 50, 'slow': loadingTime > 200}">
         {{ loadingTime }} ms
+      </span>
+      
+      <span class="status-indicator" 
+            [style.color]="socket && socket.connected ? '#00ff88' : '#ff3333'">
+          {{ socket && socket.connected ? '🟢 Live' : '🔴 Offline' }}
       </span>
     </div>
   </header>

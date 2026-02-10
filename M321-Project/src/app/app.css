@@ -277,3 +277,8 @@
   background: #444455;
   border-color: #777;
 }
+
+.status-indicator {
+  margin-left: 15px; 
+  font-weight: bold;
+}

@@ -87,7 +87,7 @@ export class BoardStateService implements OnApplicationBootstrap {
   updateCachePixel(x: number, y: number, color: Pixel) {
     if (this.boardCache.length > y && this.boardCache[y]) {
       this.boardCache[y][x] = color;
-      this.pendingUpdates.set(`${x},${y}`, Date.now() + 2000);
+      this.pendingUpdates.set(`${x},${y}`, Date.now() + 4000);
     }
   }
 }

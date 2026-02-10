@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
-import { FormsModule } from '@angular/forms'; 
+import { FormsModule } from '@angular/forms';
+// WICHTIG: Socket Client importieren
+import { io, Socket } from 'socket.io-client';
 
 interface Pixel { Red: number; Green: number; Blue: number; }
 interface Team { ID: number; Name: string; Color: Pixel; }
@@ -15,7 +17,7 @@ interface Team { ID: number; Name: string; Color: Pixel; }
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   board: any[][] = [];
   isDevMode = false;
   
@@ -23,7 +25,11 @@ export class AppComponent implements OnInit {
   errorMessage: string = '';
   successMessage: string = '';
   
-  private apiUrl = ''; 
+  // URL deines NestJS Backends
+  private apiUrl = 'http://localhost:3000'; 
+  
+  // WebSocket Verbindung (public für HTML Zugriff)
+  public socket!: Socket;
 
   teams: Team[] = [
     { ID: 0, Name: 'Team 1 (Gelb)',       Color: { Red: 255, Green: 255, Blue: 0 } },
@@ -51,16 +57,118 @@ export class AppComponent implements OnInit {
   private async configureAuth() {
     this.oauthService.configure(authConfig);
     await this.oauthService.loadDiscoveryDocumentAndTryLogin();
-
-    if (this.oauthService.hasValidAccessToken()) {
-      console.log('✅ Login erfolgreich! Token bereit.');
-      console.log('Mein dekodiertes ID-Token:', this.oauthService.getIdentityClaims());
-    }
   }
 
   ngOnInit() {
     this.isDevMode = window.location.hostname === 'localhost';
     this.initializeEmptyBoard();
+    
+    // Board initial laden
+    this.loadInitialBoard();
+
+    // WebSocket starten (Auftrag 1)
+    this.connectToWebSocket();
+  }
+
+  ngOnDestroy() {
+    if (this.socket) {
+      this.socket.disconnect();
+    }
+  }
+
+  // --- AUFTRAG 1: WebSocket Logik ---
+  private connectToWebSocket() {
+    this.socket = io(this.apiUrl, {
+      transports: ['websocket'] 
+    });
+
+    this.socket.on('connect', () => {
+      console.log('✅ Live-Verbindung zum Backend steht!');
+    });
+
+    // Wenn das Backend ein Update schickt, aktualisieren wir das Brett sofort
+    this.socket.on('pixelUpdate', (data: { x: number, y: number, color: Pixel }) => {
+      this.updateLocalPixel(data.x, data.y, data.color);
+    });
+
+    this.socket.on('disconnect', () => {
+      console.warn('Verbindung zum Backend verloren.');
+    });
+  }
+
+  // --- AUFTRAG 2: Token Check Logik ---
+  private checkTokenAndRefresh(): boolean {
+    if (!this.oauthService.hasValidAccessToken()) {
+        console.warn('Kein gültiges Token vorhanden. Starte Login...');
+        this.oauthService.initCodeFlow();
+        return false;
+    }
+
+    // Ablaufzeitpunkt holen
+    const expiration = this.oauthService.getAccessTokenExpiration(); 
+    const now = Date.now();
+    
+    // Verbleibende Zeit in Sekunden
+    const timeLeft = (expiration - now) / 1000;
+
+    // Warnung wenn weniger als 60 Sekunden übrig
+    if (timeLeft < 60 && timeLeft > 0) {
+      console.warn(`⚠️ Token läuft in ${timeLeft.toFixed(0)} Sekunden ab!`);
+    }
+
+    // Wenn abgelaufen (oder fast abgelaufen, z.B. < 5s Puffer)
+    if (timeLeft <= 5) {
+      console.error('❌ Token ist abgelaufen! Erneuere Session...');
+      this.oauthService.initCodeFlow(); // Leitet zu Keycloak um für Refresh
+      return false; // Aktion abbrechen
+    }
+
+    return true; // Token ist gut
+  }
+
+  // --- Hauptaktionen ---
+
+  onLeftClick(x: number, y: number) {
+    this.errorMessage = '';
+    
+    // ZUERST: Token prüfen (Auftrag 2)
+    if (!this.checkTokenAndRefresh()) {
+      return; 
+    }
+
+    const claims = this.userClaims;
+    const myTeamId = claims ? claims['team'] : null;
+
+    if (myTeamId === null || myTeamId === undefined) {
+      this.errorMessage = "Fehler: Kein Team gefunden! Bitte neu einloggen.";
+      return;
+    }
+
+    const myTeam = this.teams.find(t => t.ID == myTeamId);
+    if (myTeam) this.updateLocalPixel(x, y, myTeam.Color);
+
+    const payload = { x: x, y: y, teamId: myTeamId };
+    
+    const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
+    
+    this.http.post(`${this.apiUrl}/api/pixel`, payload, { headers }).subscribe({
+      next: () => {}, 
+      error: (err) => {
+        console.error('Fehler:', err);
+        this.errorMessage = "Fehler beim Senden";
+      }
+    });
+  }
+
+  private loadInitialBoard() {
+    this.http.get<any>(`${this.apiUrl}/api/board`).subscribe({
+      next: (res) => {
+        if (res.board) {
+            this.board = res.board;
+        }
+      },
+      error: (err) => console.error('Fehler beim Laden des Boards:', err)
+    });
   }
   
   hardReset() {
@@ -88,72 +196,31 @@ export class AppComponent implements OnInit {
     return `rgb(${c.Red}, ${c.Green}, ${c.Blue})`;
   }
 
-  // --- API AKTIONEN ---
-
-  onLeftClick(x: number, y: number) {
-    this.errorMessage = '';
-    
-    if (!this.oauthService.hasValidAccessToken()) {
-      this.oauthService.initCodeFlow();
-      return;
-    }
-
-    const claims = this.userClaims;
-    const myTeamId = claims ? claims['team'] : null;
-
-    if (myTeamId === null || myTeamId === undefined) {
-      this.errorMessage = "Fehler: Kein Team im Token! Bist du in Keycloak der Gruppe zugewiesen?";
-      return;
-    }
-
-    const myTeam = this.teams.find(t => t.ID == myTeamId);
-    if (myTeam) this.updateLocalPixel(x, y, myTeam.Color);
-
-    const payload = { X: x, Y: y, Team: myTeamId };
-    const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
-    
-    this.http.post(`${this.apiUrl}/api/color`, payload, { headers, responseType: 'text' }).subscribe({
-      next: (response) => console.log('Pixel gesendet:', response),
-      error: (err) => {
-        console.error('Fehler beim Malen:', err);
-        if (err.status !== 200) {
-            this.errorMessage = "Server Fehler: " + (err.error || err.message || err.statusText);
-        }
-      }
-    });
-  }
-
   registerPlayer(gamerTag: string) {
     if (!gamerTag) return;
-    this.errorMessage = '';
-    
+    if (!this.checkTokenAndRefresh()) return; 
+
     const payload = { Name: gamerTag };
-    const headers = this.getAuthHeaders();
-    
     this.http.post(`${this.apiUrl}/api/player/register`, payload, { 
-      headers: headers.set('Content-Type', 'application/json'), 
+      headers: this.getAuthHeaders().set('Content-Type', 'application/json'), 
       responseType: 'text' 
     }).subscribe({
-      next: () => {
-        this.successMessage = `Spieler '${gamerTag}' registriert!`;
-      },
+      next: () => this.successMessage = `Registriert!`,
       error: (err) => this.handleError(err)
     });
   }
 
   registerTeam(teamName: string) {
     if (!teamName) return;
-    this.errorMessage = '';
-    
+    if (!this.checkTokenAndRefresh()) return;
+
     const payload = JSON.stringify(teamName);
     const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
-
     this.http.post(`${this.apiUrl}/api/team/register`, payload, { headers, responseType: 'text' }).subscribe({
-      next: () => this.successMessage = `Team '${teamName}' registriert!`,
+      next: () => this.successMessage = `Team registriert!`,
       error: (err) => {
-        console.log("POST fehlgeschlagen, versuche PUT...");
         this.http.put(`${this.apiUrl}/api/team/name`, payload, { headers, responseType: 'text' }).subscribe({
-            next: () => this.successMessage = `Team Name in '${teamName}' geändert!`,
+            next: () => this.successMessage = `Team umbenannt!`,
             error: (e) => this.handleError(e)
         });
       }
@@ -166,12 +233,11 @@ export class AppComponent implements OnInit {
 
   private handleError(err: any) {
     if (err.status === 200) return;
-    this.errorMessage = err.error || err.message || "Unbekannter Fehler";
+    this.errorMessage = err.error || err.message || "Fehler";
   }
 
   private getAuthHeaders(): HttpHeaders {
     const token = this.oauthService.getAccessToken();
-    if (!token) console.warn("Achtung: Kein Token gefunden!");
     return new HttpHeaders().set('Authorization', 'Bearer ' + token);
   }
 
