@@ -4,7 +4,6 @@ import { CommonModule } from '@angular/common';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
 import { FormsModule } from '@angular/forms';
-// WICHTIG: Socket Client importieren
 import { io, Socket } from 'socket.io-client';
 
 interface Pixel { Red: number; Green: number; Blue: number; }
@@ -25,10 +24,8 @@ export class AppComponent implements OnInit, OnDestroy {
   errorMessage: string = '';
   successMessage: string = '';
   
-  // URL deines NestJS Backends
   private apiUrl = 'http://localhost:3000'; 
   
-  // WebSocket Verbindung (public für HTML Zugriff)
   public socket!: Socket;
 
   teams: Team[] = [
@@ -63,10 +60,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isDevMode = window.location.hostname === 'localhost';
     this.initializeEmptyBoard();
     
-    // Board initial laden
     this.loadInitialBoard();
 
-    // WebSocket starten (Auftrag 1)
     this.connectToWebSocket();
   }
 
@@ -76,7 +71,6 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- AUFTRAG 1: WebSocket Logik ---
   private connectToWebSocket() {
     this.socket = io(this.apiUrl, {
       transports: ['websocket'] 
@@ -86,7 +80,6 @@ export class AppComponent implements OnInit, OnDestroy {
       console.log('✅ Live-Verbindung zum Backend steht!');
     });
 
-    // Wenn das Backend ein Update schickt, aktualisieren wir das Brett sofort
     this.socket.on('pixelUpdate', (data: { x: number, y: number, color: Pixel }) => {
       this.updateLocalPixel(data.x, data.y, data.color);
     });
@@ -96,7 +89,6 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- AUFTRAG 2: Token Check Logik ---
   private checkTokenAndRefresh(): boolean {
     if (!this.oauthService.hasValidAccessToken()) {
         console.warn('Kein gültiges Token vorhanden. Starte Login...');
@@ -104,34 +96,27 @@ export class AppComponent implements OnInit, OnDestroy {
         return false;
     }
 
-    // Ablaufzeitpunkt holen
     const expiration = this.oauthService.getAccessTokenExpiration(); 
     const now = Date.now();
     
-    // Verbleibende Zeit in Sekunden
     const timeLeft = (expiration - now) / 1000;
 
-    // Warnung wenn weniger als 60 Sekunden übrig
     if (timeLeft < 60 && timeLeft > 0) {
       console.warn(`⚠️ Token läuft in ${timeLeft.toFixed(0)} Sekunden ab!`);
     }
 
-    // Wenn abgelaufen (oder fast abgelaufen, z.B. < 5s Puffer)
     if (timeLeft <= 5) {
       console.error('❌ Token ist abgelaufen! Erneuere Session...');
-      this.oauthService.initCodeFlow(); // Leitet zu Keycloak um für Refresh
-      return false; // Aktion abbrechen
+      this.oauthService.initCodeFlow();
+      return false;
     }
 
-    return true; // Token ist gut
+    return true;
   }
-
-  // --- Hauptaktionen ---
 
   onLeftClick(x: number, y: number) {
     this.errorMessage = '';
     
-    // ZUERST: Token prüfen (Auftrag 2)
     if (!this.checkTokenAndRefresh()) {
       return; 
     }
