@@ -27,6 +27,13 @@ export class AppComponent implements OnInit, OnDestroy {
   private apiUrl = 'http://localhost:3000'; 
   
   public socket!: Socket;
+  
+  teamInfo: any = null;
+  leaderboard: any[] = [];
+
+  isDrawing = false;
+  botActive = false;
+  private botInterval: any;
 
   teams: Team[] = [
     { ID: 0, Name: 'Team 1 (Gelb)',       Color: { Red: 255, Green: 255, Blue: 0 } },
@@ -63,11 +70,19 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadInitialBoard();
 
     this.connectToWebSocket();
+    
+    setTimeout(() => {
+        this.fetchTeamInfo();
+        this.fetchLeaderboard();
+    }, 1500);
   }
 
   ngOnDestroy() {
     if (this.socket) {
       this.socket.disconnect();
+    }
+    if (this.botInterval) {
+      clearInterval(this.botInterval);
     }
   }
 
@@ -77,7 +92,7 @@ export class AppComponent implements OnInit, OnDestroy {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Live-Verbindung zum Backend steht!');
+      console.log('✅ Live Verbindung zum Backend steht!');
     });
 
     this.socket.on('pixelUpdate', (data: { x: number, y: number, color: Pixel }) => {
@@ -113,6 +128,93 @@ export class AppComponent implements OnInit, OnDestroy {
 
     return true;
   }
+  
+  fetchTeamInfo() {
+    const claims = this.userClaims;
+    const myTeamId = claims ? claims['team'] : null;
+
+    if (myTeamId !== null && myTeamId !== undefined) {
+      this.http.get<any>(`${this.apiUrl}/api/game/team/${myTeamId}`, { headers: this.getAuthHeaders() }).subscribe({
+        next: (res) => this.teamInfo = res,
+        error: (err) => console.error('Fehler beim Abrufen der Teamdaten', err)
+      });
+    }
+  }
+
+  fetchLeaderboard() {
+    if (!this.oauthService.hasValidAccessToken()) return;
+    const headers = this.getAuthHeaders();
+
+    this.http.get<any[]>(`${this.apiUrl}/api/teams`).subscribe({
+      next: (teams) => {
+        const newLeaderboard: any[] = [];
+        let loaded = 0;
+        
+        if (!teams || teams.length === 0) return;
+
+        teams.forEach(t => {
+          const teamId = t.ID !== undefined ? t.ID : t.id;
+          this.http.get<any>(`${this.apiUrl}/api/game/team/${teamId}`, { headers }).subscribe({
+            next: (gameInfo) => {
+              newLeaderboard.push({
+                id: teamId,
+                name: t.Name || t.name,
+                color: t.Color || t.color,
+                points: parseInt(gameInfo.Points || gameInfo.points || '0', 10) || 0,
+                budget: parseInt(gameInfo.Budget || gameInfo.budget || '0', 10) || 0
+              });
+              loaded++;
+              if (loaded === teams.length) {
+                this.leaderboard = newLeaderboard.sort((a, b) => b.points - a.points);
+              }
+            },
+            error: () => {
+              loaded++;
+              if (loaded === teams.length) {
+                this.leaderboard = newLeaderboard.sort((a, b) => b.points - a.points);
+              }
+            }
+          });
+        });
+      },
+      error: (err) => console.error('Fehler beim Laden der Teams', err)
+    });
+  }
+
+  onMouseDown(x: number, y: number) {
+    this.isDrawing = true;
+    this.onLeftClick(x, y);
+  }
+
+  onMouseEnter(x: number, y: number) {
+    if (this.isDrawing) {
+      this.onLeftClick(x, y);
+    }
+  }
+
+  onMouseUp() {
+    this.isDrawing = false;
+  }
+
+  toggleBot() {
+    this.botActive = !this.botActive;
+    if (this.botActive) {
+      this.botInterval = setInterval(() => this.autoPlay(), 500);
+    } else {
+      clearInterval(this.botInterval);
+    }
+  }
+
+  autoPlay() {
+    if (!this.teamInfo) return;
+    const currentBudget = parseInt(this.teamInfo.Budget || this.teamInfo.budget || '0', 10);
+    
+    if (currentBudget > 0) {
+      const x = Math.floor(Math.random() * 16);
+      const y = Math.floor(Math.random() * 16);
+      this.onLeftClick(x, y);
+    }
+  }
 
   onLeftClick(x: number, y: number) {
     this.errorMessage = '';
@@ -133,14 +235,14 @@ export class AppComponent implements OnInit, OnDestroy {
     if (myTeam) this.updateLocalPixel(x, y, myTeam.Color);
 
     const payload = { x: x, y: y, teamId: myTeamId };
-    
     const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
     
     this.http.post(`${this.apiUrl}/api/pixel`, payload, { headers }).subscribe({
-      next: () => {}, 
+      next: () => {
+         this.fetchTeamInfo();
+      }, 
       error: (err) => {
         console.error('Fehler:', err);
-        this.errorMessage = "Fehler beim Senden";
       }
     });
   }

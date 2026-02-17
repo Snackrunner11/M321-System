@@ -282,3 +282,81 @@
   margin-left: 15px; 
   font-weight: bold;
 }
+
+.team-status-box {
+  margin-top: 15px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.clean-list {
+  list-style: none;
+  padding: 0;
+}
+
+.bot-description {
+  font-size: 0.8em;
+  margin-top: 5px;
+}
+
+.bot-active {
+  background: #ff3333 !important;
+  color: white !important;
+}
+
+.bot-inactive {
+  background: #00ff88 !important;
+  color: black !important;
+}
+
+.refresh-button {
+  margin-bottom: 10px;
+}
+
+.loading-hint {
+  opacity: 0.7;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.leaderboard-header {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.table-pad {
+  padding: 10px;
+}
+
+.leaderboard-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.highlight-row {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.color-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.you-label {
+  font-size: 0.8em;
+  color: #00ff88;
+}
+
+.points-highlight {
+  font-weight: bold;
+  color: #ffd700;
+}

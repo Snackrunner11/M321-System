@@ -7,9 +7,10 @@ import {
   Logger,
   UseGuards,
   Request,
+  Param,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { AppService, Team } from './app.service';
+import { AppService, Team, TeamGameInfo } from './app.service';
 import { BoardStateService } from './board-state.service';
 import { EventsGateway } from './events.gateway';
 
@@ -20,7 +21,7 @@ interface UserPayload {
   team?: number;
 }
 
-interface RequestWithUser extends Request {
+interface RequestWithUser {
   user: UserPayload;
 }
 
@@ -49,6 +50,12 @@ export class AppController implements OnModuleInit {
       board: this.boardStateService.getBoard(),
       duration: this.boardStateService.getLastDuration(),
     };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('game/team/:id')
+  async getTeamInfo(@Param('id') id: string): Promise<TeamGameInfo> {
+    return await this.appService.getTeamInfo(Number(id));
   }
 
   @UseGuards(AuthGuard('jwt'))

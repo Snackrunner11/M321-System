@@ -4,7 +4,7 @@
     ⚠️ DEVELOPMENT ENVIRONMENT ⚠️
   </div>
 
-<header>
+  <header>
     <h1 class="title">Pixelboard</h1>
     <div class="meta-info">
       <span class="status-label">⏱️ Ladezeit:</span>
@@ -41,6 +41,15 @@
         <p class="user-info-text"><strong>Keycloak ID:</strong> {{ userClaims['preferred_username'] }}</p>
         <p class="user-info-text"><strong>Team Claim:</strong> {{ userClaims['team'] || 'Kein Team' }}</p>
         
+        <div *ngIf="teamInfo" class="team-status-box">
+          <h4>Farbbudget und Teamstatus</h4>
+          <ul class="clean-list">
+            <li *ngFor="let item of teamInfo | keyvalue">
+              <strong>{{ item.key }}:</strong> {{ item.value }}
+            </li>
+          </ul>
+        </div>
+
         <div class="registration-area">
             <h4>Registrierung (Einmalig)</h4>
             
@@ -69,16 +78,60 @@
         </div>
       </div>
       <div class="instructions">
-        <span>🖱️ Links: Malen</span> | <span>🖱️ Rechts: Team wechseln</span>
+        <span>🖱️ Klicken und Ziehen: Malen</span> | <span>🖱️ Rechts: Team wechseln</span>
       </div>
     </div>
 
+    <div class="control-panel card-entrance" *ngIf="userClaims">
+      <h3>🤖 Automatisierung</h3>
+      <button (click)="toggleBot()" class="btn-action" [class.bot-active]="botActive" [class.bot-inactive]="!botActive">
+        {{ botActive ? 'Bot stoppen' : 'Bot starten' }}
+      </button>
+      <p class="bot-description">Platziert automatisch Pixel, wenn das Budget voll ist.</p>
+    </div>
+
+    <div class="control-panel card-entrance" *ngIf="userClaims">
+      <h3>🏆 Rangliste & gegnerische Teams</h3>
+      <button (click)="fetchLeaderboard()" class="btn-action refresh-button">
+        🔄 Aktualisieren
+      </button>
+      
+      <div *ngIf="leaderboard.length === 0" class="loading-hint">
+        Lade Daten...
+      </div>
+
+      <table *ngIf="leaderboard.length > 0" class="leaderboard-table">
+        <thead class="leaderboard-header">
+          <tr>
+            <th class="table-pad">Farbe</th>
+            <th class="table-pad">Team</th>
+            <th class="table-pad">Punkte</th>
+            <th class="table-pad">Budget</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of leaderboard" 
+              [ngClass]="{'highlight-row': row.id == userClaims?.team}"
+              class="leaderboard-row">
+            <td class="table-pad">
+              <div [style.background-color]="'rgb(' + (row.color?.Red||row.color?.r||0) + ',' + (row.color?.Green||row.color?.g||0) + ',' + (row.color?.Blue||row.color?.b||0) + ')'" 
+                   class="color-indicator"></div>
+            </td>
+            <td class="table-pad">{{ row.name }} <span *ngIf="row.id == userClaims?.team" class="you-label">(Du)</span></td>
+            <td class="table-pad points-highlight">{{ row.points }}</td>
+            <td class="table-pad">{{ row.budget }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="board-wrapper card-entrance" *ngIf="board.length > 0">
-      <div class="board-grid" (contextmenu)="onRightClick($event)">
+      <div class="board-grid" (contextmenu)="onRightClick($event)" (mouseup)="onMouseUp()" (mouseleave)="onMouseUp()">
         <div *ngFor="let row of board; index as y" class="board-row">
           <div *ngFor="let pixel of row; index as x" 
                class="pixel"
-               (click)="onLeftClick(x, y)"
+               (mousedown)="onMouseDown(x, y)"
+               (mouseenter)="onMouseEnter(x, y)"
                [style.background-color]="'rgb(' + (pixel.Red||pixel.r||0) + ',' + (pixel.Green||pixel.g||0) + ',' + (pixel.Blue||pixel.b||0) + ')'">
           </div>
         </div>

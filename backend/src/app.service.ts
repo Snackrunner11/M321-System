@@ -14,6 +14,12 @@ export interface Team {
   Color: Pixel;
 }
 
+export interface TeamGameInfo {
+  points: number;
+  budget: number;
+  [key: string]: any;
+}
+
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
@@ -153,6 +159,22 @@ export class AppService {
       return JSON.parse(text) as Pixel;
     } catch {
       return { Red: 0, Green: 0, Blue: 0 };
+    }
+  }
+
+  async getTeamInfo(teamId: number): Promise<TeamGameInfo> {
+    try {
+      const response = await fetch(`${this.baseUrl}/game/team/${teamId}`);
+      if (!response.ok) {
+        return { points: 0, budget: 0 };
+      }
+      return (await response.json()) as TeamGameInfo;
+    } catch (e) {
+      this.logger.error(
+        'Fehler beim Abrufen der Teamdaten fuer Team ' + String(teamId),
+        e,
+      );
+      return { points: 0, budget: 0 };
     }
   }
 }
