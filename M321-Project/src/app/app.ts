@@ -5,6 +5,7 @@ import { OAuthService } from 'angular-oauth2-oidc';
 import { authConfig } from './app.config';
 import { FormsModule } from '@angular/forms';
 import { io, Socket } from 'socket.io-client';
+import { environment } from '../environments/environment';
 
 interface Pixel { Red: number; Green: number; Blue: number; }
 interface Team { ID: number; Name: string; Color: Pixel; }
@@ -24,7 +25,7 @@ export class AppComponent implements OnInit, OnDestroy {
   errorMessage: string = '';
   successMessage: string = '';
   
-  private apiUrl = 'http://localhost:3000'; 
+  private apiUrl = environment.apiUrl;
   
   public socket!: Socket;
   
@@ -145,7 +146,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!this.oauthService.hasValidAccessToken()) return;
     const headers = this.getAuthHeaders();
 
-    this.http.get<any[]>(`${this.apiUrl}/api/teams`).subscribe({
+    this.http.get<any[]>(`${this.apiUrl}/api/team`).subscribe({
       next: (teams) => {
         const newLeaderboard: any[] = [];
         let loaded = 0;
@@ -237,7 +238,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const payload = { x: x, y: y, teamId: myTeamId };
     const headers = this.getAuthHeaders().set('Content-Type', 'application/json');
     
-    this.http.post(`${this.apiUrl}/api/pixel`, payload, { headers }).subscribe({
+    this.http.post(`${this.apiUrl}/api/color`, payload, { headers }).subscribe({
       next: () => {
          this.fetchTeamInfo();
       }, 
