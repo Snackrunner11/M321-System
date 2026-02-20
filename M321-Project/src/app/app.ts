@@ -131,6 +131,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
   
   fetchTeamInfo() {
+    if (!this.oauthService.hasValidAccessToken()) return;
+
     const claims = this.userClaims;
     const myTeamId = claims ? claims['team'] : null;
 
@@ -146,7 +148,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!this.oauthService.hasValidAccessToken()) return;
     const headers = this.getAuthHeaders();
 
-    this.http.get<any[]>(`${this.apiUrl}/api/team`).subscribe({
+    this.http.get<any[]>(`${this.apiUrl}/api/teams`).subscribe({
       next: (teams) => {
         const newLeaderboard: any[] = [];
         let loaded = 0;
