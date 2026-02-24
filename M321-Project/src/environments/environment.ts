@@ -4,6 +4,6 @@ export const environment = {
   keycloak: {
     issuer: 'https://auth.jakobmeier.ch/realms/pixelboard-test',
     clientId: 'student_client',
-    dummyClientSecret: 'W3O3oYj1Qny3ATcvE6nrozLe17KyW6e9'
+    dummyClientSecret: '42L4oVnt3DK7eNDuiKmBPfPcNC7tF4gv'
   }
 };
